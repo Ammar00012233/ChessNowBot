@@ -1,329 +1,184 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Add viewport meta tag -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zoge Chess</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body {
-            background: #232323;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0; /* Remove default margin */
-            overflow-x: hidden; /* Prevent horizontal scrolling */
-        }
-        #start-screen {
-            margin-top: 10vh; /* Use viewport height for margin */
-        }
-        button {
-            background: #77c353;
-            color: #fff;
-            border: none;
-            padding: 1.5vh 3vw; /* Relative padding */
-            font-size: clamp(1em, 2.5vw, 1.2em); /* Responsive font size */
-            border-radius: 1vw;
-            cursor: pointer;
-            margin-top: 2vh;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background: #4fa32c;
-        }
-        #chess-game {
-            margin-top: 5vh;
-        }
-        #board {
-            display: grid;
-            grid-template: repeat(8, 12.5%) / repeat(8, 12.5%); /* Relative grid */
-            margin: 0 auto;
-            border: 0.5vw solid #77c353; /* Relative border */
-            width: min(90vw, 500px); /* Max width with responsiveness */
-            aspect-ratio: 1 / 1; /* Maintain square board */
-            background: #333;
-        }
-        .square {
-            width: 100%; /* Full width of grid cell */
-            height: 100%; /* Full height of grid cell */
-            font-size: clamp(1.5em, 4vw, 2em); /* Responsive piece size */
-            line-height: 100%; /* Center pieces vertically */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: box-shadow 0.2s;
-            user-select: none;
-        }
-        /* Classic chessboard squares */
-        .white { background: #f0d9b5; } /* Light brown */
-        .black { background: #b58863; } /* Dark brown */
-        /* White player pieces */
-        .piece-white {
-            color: #ffffff;
-            text-shadow: 1px 1px 2px #000;
-            font-weight: bold;
-        }
-        /* Black computer pieces */
-        .piece-black {
-            color: #000000;
-            text-shadow: 1px 1px 2px #fff;
-            font-weight: bold;
-        }
-        .selected { outline: 0.3vw solid #77c353; } /* Relative outline */
-        .move-target {
-            box-shadow: 0 0 0 0.5vw #77c353 inset !important; /* Relative inset shadow */
-            cursor: pointer;
-        }
-        /* Media query for smaller screens */
-        @media (max-width: 600px) {
-            #start-screen {
-                margin-top: 5vh;
-            }
-            button {
-                padding: 2vh 5vw;
-                font-size: clamp(0.9em, 3vw, 1em);
-            }
-            #board {
-                width: 95vw; /* Slightly larger on small screens */
-                border: 0.7vw solid #77c353;
-            }
-            .square {
-                font-size: clamp(1.2em, 5vw, 1.5em); /* Smaller pieces on small screens */
-            }
-            .selected { outline: 0.4vw solid #77c353; }
-            .move-target { box-shadow: 0 0 0 0.6vw #77c353 inset !important; }
-        }
+        body { background:#121212; color:#fff; font-family:Arial; text-align:center; margin:0; padding:20px; }
+        #profile { background:#1e1e1e; padding:20px; margin:20px auto; max-width:500px; border-radius:15px; box-shadow:0 5px 20px rgba(0,0,0,0.5); }
+        #points { font-size:3em; color:#77c353; font-weight:bold; }
+        .stats { font-size:1.4em; margin:15px; }
+        button { background:#77c353; color:#fff; border:none; padding:15px 30px; font-size:1.5em; border-radius:12px; margin:15px; cursor:pointer; }
+        button:hover { background:#5a9b3a; }
+        #board { width:min(95vw,500px); margin:20px auto; }
+        #status { font-size:1.8em; margin:20px; font-weight:bold; }
+        #loading { color:#ffeb3b; font-size:1.6em; margin:20px; }
     </style>
 </head>
 <body>
-    <div id="start-screen">
-        <h1>Play Chess.<br>Improve your game.<br>Have fun!</h1>
-        <button id="get-started">Start Now</button>
+    <div id="profile">
+        <h2>مرحبا يا <span id="player-name">لاعب</span>!</h2>
+        <div id="points">0</div>
+        <div class="stats">فوز: <span id="wins">0</span> | خسارة: <span id="losses">0</span> | تعادل: <span id="draws">0</span></div>
     </div>
-    <div id="chess-game" style="display:none;">
-        <h2>Chess vs Computer</h2>
+
+    <div id="game-area">
+        <h2>شطرنج ضد AI قوي جدًا</h2>
+        <div id="loading" style="display:none;">الـAI بيفكر بعمق...</div>
         <div id="board"></div>
-        <div id="info"></div>
-        <button id="restart">Restart</button>
+        <div id="status">اضغط زر للبداية</div>
+        <button onclick="newGame('w')">العب أبيض (أنت تبدأ)</button>
+        <button onclick="newGame('b')">العب أسود (AI يبدأ)</button>
     </div>
-    <!-- Sounds -->
+
     <audio id="move-sound" src="https://assets.mixkit.co/sfx/download/mixkit-chess-piece-move-2107.mp3"></audio>
     <audio id="win-sound" src="https://assets.mixkit.co/sfx/download/mixkit-winning-chimes-2015.mp3"></audio>
-    <audio id="draw-sound" src="https://assets.mixkit.co/sfx/download/mixkit-game-level-completed-2059.mp3"></audio>
 
     <script>
-        const pieces = {
-            wK: "♔", wQ: "♕", wR: "♖", wB: "♗", wN: "♘", wP: "♙",
-            bK: "♚", bQ: "♛", bR: "♜", bB: "♝", bN: "♞", bP: "♟"
+        // Supabase config بتاعك
+        const supabaseUrl = 'https://jcgdxtnspmqwunzfkdqa.supabase.co';
+        const supabaseKey = 'sb_publishable_yRrI83fceQxrCpug9LOIRg_GZoKR_d4';
+
+        const { createClient } = supabase;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const user = tg.initDataUnsafe?.user || { id: 999999999, first_name: 'لاعب' };
+        document.getElementById('player-name').textContent = user.first_name || 'لاعب';
+
+        // جلب وتسجيل البروفايل
+        async function loadProfile() {
+            let { data, error } = await supabase
+                .from('players')
+                .select('*')
+                .eq('telegram_id', user.id)
+                .single();
+
+            if (error || !data) {
+                // تسجيل جديد
+                const { data: newData, error: newError } = await supabase
+                    .from('players')
+                    .insert({
+                        telegram_id: user.id,
+                        username: user.username || '',
+                        first_name: user.first_name || 'لاعب'
+                    })
+                    .select()
+                    .single();
+                data = newData;
+            }
+
+            document.getElementById('points').textContent = data.points || 0;
+            document.getElementById('wins').textContent = data.wins || 0;
+            document.getElementById('losses').textContent = data.losses || 0;
+            document.getElementById('draws').textContent = data.draws || 0;
+        }
+
+        // تحديث النقاط
+        async function updateStats(result) {
+            let pointsChange = 0;
+            let winsChange = 0;
+            let lossesChange = 0;
+            let drawsChange = 0;
+
+            if (result === 'win') { pointsChange = 10; winsChange = 1; }
+            else if (result === 'loss') { pointsChange = -5; lossesChange = 1; }
+            else { pointsChange = 2; drawsChange = 1; }
+
+            await supabase
+                .from('players')
+                .update({
+                    points: supabase.raw('points + ?', pointsChange),
+                    wins: supabase.raw('wins + ?', winsChange),
+                    losses: supabase.raw('losses + ?', lossesChange),
+                    draws: supabase.raw('draws + ?', drawsChange)
+                })
+                .eq('telegram_id', user.id);
+
+            loadProfile();
+        }
+
+        const game = new Chess();
+        let board = Chessboard('board', {
+            draggable: true,
+            position: 'start',
+            onDrop: onDrop
+        });
+        let engine = STOCKFISH();
+
+        engine.onmessage = (event) => {
+            const line = event.data || event;
+            if (line.includes('bestmove')) {
+                const move = line.split(' ')[1];
+                if (move && move !== '(none)') {
+                    game.move(move);
+                    board.position(game.fen());
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('status').textContent = 'دورك!';
+                    moveSound.play();
+                    checkGameEnd();
+                }
+            }
         };
 
-        let board, turn, selected, gameOver, moveTargets = [];
-        const startBtn = document.getElementById("get-started");
-        const startScreen = document.getElementById("start-screen");
-        const chessGame = document.getElementById("chess-game");
-        const boardDiv = document.getElementById("board");
-        const infoDiv = document.getElementById("info");
-        const restartBtn = document.getElementById("restart");
-        const moveSound = document.getElementById("move-sound");
-        const winSound = document.getElementById("win-sound");
-        const drawSound = document.getElementById("draw-sound");
+        engine.postMessage('uci');
+        engine.postMessage('setoption name Skill Level value 20');
+        engine.postMessage('setoption name Threads value 4');
 
-        startBtn.onclick = () => {
-            startScreen.style.display = "none";
-            chessGame.style.display = "block";
-            startGame();
-        };
-
-        restartBtn.onclick = () => startGame();
-
-        function startGame() {
-            board = [
-                ["bR","bN","bB","bQ","bK","bB","bN","bR"],
-                ["bP","bP","bP","bP","bP","bP","bP","bP"],
-                [null,null,null,null,null,null,null,null],
-                [null,null,null,null,null,null,null,null],
-                [null,null,null,null,null,null,null,null],
-                [null,null,null,null,null,null,null,null],
-                ["wP","wP","wP","wP","wP","wP","wP","wP"],
-                ["wR","wN","wB","wQ","wK","wB","wN","wR"]
-            ];
-            turn = "w";
-            selected = null;
-            gameOver = false;
-            moveTargets = [];
-            drawBoard();
-            infoDiv.textContent = "Your turn!";
-        }
-
-        function drawBoard() {
-            boardDiv.innerHTML = "";
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const sq = document.createElement("div");
-                    sq.classList.add("square");
-                    sq.classList.add((r + c) % 2 == 0 ? "white" : "black");
-                    sq.dataset.row = r;
-                    sq.dataset.col = c;
-                    if (board[r][c]) {
-                        if (board[r][c][0] === "w") {
-                            sq.innerHTML = `<span class="piece-white">${pieces[board[r][c]]}</span>`;
-                        } else {
-                            sq.innerHTML = `<span class="piece-black">${pieces[board[r][c]]}</span>`;
-                        }
-                    }
-                    if (moveTargets.some(([tr, tc]) => tr === r && tc === c)) {
-                        sq.classList.add("move-target");
-                        sq.onclick = () => playerMoveTo(r, c);
-                    } else if (selected && selected[0] === r && selected[1] === c) {
-                        sq.classList.add("selected");
-                        sq.onclick = () => selectPiece(r, c);
-                    } else if (turn === "w" && !gameOver && board[r][c] && board[r][c][0] === "w") {
-                        sq.onclick = () => selectPiece(r, c);
-                    }
-                    boardDiv.appendChild(sq);
-                }
+        function onDrop(source, target) {
+            const move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+            moveSound.play();
+            if (game.game_over()) {
+                checkGameEnd();
+                return;
             }
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('status').textContent = 'الـAI بيفكر...';
+            engine.postMessage('position fen ' + game.fen());
+            engine.postMessage('go depth 30'); // صعوبة رهيبة
         }
 
-        function selectPiece(r, c) {
-            if (turn !== "w" || gameOver) return;
-            selected = [r, c];
-            moveTargets = getAvailableMoves(board[r][c], r, c);
-            drawBoard();
-        }
-
-        function playerMoveTo(r, c) {
-            if (!selected) return;
-            const [sr, sc] = selected;
-            movePiece(sr, sc, r, c);
-            moveSound.currentTime = 0; moveSound.play();
-            turn = "b";
-            selected = null;
-            moveTargets = [];
-            drawBoard();
-            setTimeout(computerMove, 700);
-        }
-
-        function movePiece(sr, sc, r, c) {
-            board[r][c] = board[sr][sc];
-            board[sr][sc] = null;
-            if (board[r][c] === "wK" || board[r][c] === "bK") {
-                checkGameOver();
-            }
-        }
-
-        function computerMove() {
-            if (gameOver) return;
-            let moves = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] && board[r][c][0] === "b") {
-                        let avMoves = getAvailableMoves(board[r][c], r, c);
-                        avMoves.forEach(([tr, tc]) => {
-                            moves.push({from: [r, c], to: [tr, tc]});
-                        });
-                    }
-                }
-            }
-            if (moves.length > 0) {
-                const move = moves[Math.floor(Math.random() * moves.length)];
-                movePiece(...move.from, ...move.to);
-                moveSound.currentTime = 0; moveSound.play();
-                turn = "w";
-                drawBoard();
-                infoDiv.textContent = "Your turn!";
-            } else {
-                infoDiv.textContent = "Draw!";
-                drawSound.play();
-                gameOver = true;
-            }
-        }
-
-        function checkGameOver() {
-            let kings = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] === "wK") kings.push("w");
-                    if (board[r][c] === "bK") kings.push("b");
-                }
-            }
-            if (!kings.includes("w")) {
-                infoDiv.textContent = "Computer Wins!";
+        function checkGameEnd() {
+            if (game.in_checkmate()) {
+                const result = game.turn() === 'w' ? 'loss' : 'win'; // لو دور الأبيض، اللاعب خسر لو هو أبيض
+                updateStats(result);
+                document.getElementById('status').textContent = result === 'win' ? 'فزت! +10 نقاط 🎉' : 'خسرت! -5 نقاط';
                 winSound.play();
-                gameOver = true;
-            } else if (!kings.includes("b")) {
-                infoDiv.textContent = "You Win 🎉";
-                winSound.play();
-                gameOver = true;
+            } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
+                updateStats('draw');
+                document.getElementById('status').textContent = 'تعادل! +2 نقاط';
             }
         }
 
-        function isValidMove(piece, sr, sc, r, c) {
-            if (!piece) return false;
-            if (board[r][c] && board[r][c][0] === piece[0]) return false;
-            if (piece[1] === "P") {
-                let dir = piece[0] === "w" ? -1 : 1;
-                if (sc === c && !board[r][c]) {
-                    if (r - sr === dir) return true;
-                    if ((piece[0] === "w" && sr === 6 && r === 4 && !board[5][c]) ||
-                        (piece[0] === "b" && sr === 1 && r === 3 && !board[2][c])) {
-                        return true;
-                    }
-                }
-                if (Math.abs(sc - c) === 1 && r - sr === dir && board[r][c] && board[r][c][0] !== piece[0]) {
-                    return true;
-                }
+        let playerColor = 'w';
+        function newGame(color) {
+            playerColor = color;
+            game.reset();
+            board.position('start');
+            document.getElementById('status').textContent = 'دورك!';
+            document.getElementById('loading').style.display = 'none';
+            if (color === 'b') {
+                document.getElementById('loading').style.display = 'block';
+                engine.postMessage('position fen ' + game.fen());
+                engine.postMessage('go depth 30');
             }
-            if (piece[1] === "R") {
-                if (sr === r || sc === c) {
-                    if (clearPath(sr, sc, r, c)) return true;
-                }
-            }
-            if (piece[1] === "N") {
-                if ((Math.abs(sr - r) === 2 && Math.abs(sc - c) === 1) ||
-                    (Math.abs(sr - r) === 1 && Math.abs(sc - c) === 2)) {
-                    return true;
-                }
-            }
-            if (piece[1] === "B") {
-                if (Math.abs(sr - r) === Math.abs(sc - c)) {
-                    if (clearPath(sr, sc, r, c)) return true;
-                }
-            }
-            if (piece[1] === "Q") {
-                if ((sr === r || sc === c || Math.abs(sr - r) === Math.abs(sc - c)) &&
-                    clearPath(sr, sc, r, c)) {
-                    return true;
-                }
-            }
-            if (piece[1] === "K") {
-                if (Math.abs(sr - r) <= 1 && Math.abs(sc - c) <= 1) return true;
-            }
-            return false;
         }
 
-        function clearPath(sr, sc, r, c) {
-            let dr = Math.sign(r - sr);
-            let dc = Math.sign(c - sc);
-            let currR = sr + dr, currC = sc + dc;
-            while (currR !== r || currC !== c) {
-                if (board[currR][currC]) return false;
-                currR += dr;
-                currC += dc;
-            }
-            return true;
-        }
+        const moveSound = document.getElementById('move-sound');
+        const winSound = document.getElementById('win-sound');
 
-        function getAvailableMoves(piece, sr, sc) {
-            let moves = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (isValidMove(piece, sr, sc, r, c)) {
-                        moves.push([r, c]);
-                    }
-                }
-            }
-            return moves;
-        }
+        loadProfile(); // تحميل البروفايل لما الصفحة تفتح
     </script>
 </body>
 </html>
