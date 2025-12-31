@@ -4,85 +4,127 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>شطرنج قوي جداً</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
-  <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
+  <script type="text/javascript" src="https://unpkg.com/stockfish@16/src/stockfish-nnue.wasm.js"></script>
   <style>
-    body { background: #121212; color: white; text-align: center; font-family: Arial; }
-    #board { width: 90vw; max-width: 500px; margin: 20px auto; }
-    button { padding: 10px 20px; font-size: 18px; margin: 10px; background: #1E88E5; color: white; border: none; border-radius: 8px; }
+    body { background: #121212; color: white; text-align: center; font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+    h1 { font-size: 28px; margin: 10px; }
+    p { font-size: 18px; }
+    #board { width: 95vw; max-width: 500px; margin: 20px auto; }
+    button { padding: 12px 24px; font-size: 18px; margin: 10px; background: #1E88E5; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    #status { font-size: 22px; margin: 20px; font-weight: bold; }
+    #loading { font-size: 18px; color: #FFD700; margin: 20px; }
   </style>
 </head>
 <body>
   <h1>♟️ شطرنج ضد AI قوي جداً جداً ♟️</h1>
-  <p>الـAI ده Stockfish (أقوى محرك في العالم، صعب على المحترفين!)</p>
-  <div id="board"></div>
+  <p>Stockfish Elo ~3500+ – أقوى محرك في العالم (هيضربك ضرب صعب!)</p>
+  <div id="loading">جاري تحميل اللوحة والمحرك القوي... انتظر ثواني (أول مرة بس)</div>
+  <div id="board" style="display: none;"></div>
   <button id="startWhite">العب أبيض (أنت تبدأ)</button>
-  <button id="startBlack">العب أسود (AI يبدأ)</button>
+  <button id="startBlack">العب أسود (AI يبدأ أول)</button>
   <button id="newGame">لعبة جديدة</button>
-  <p id="status"></p>
+  <p id="status">اضغط زر للبداية</p>
 
   <script>
-    let game = new Chess();
-    let board;
-    let engine = new Worker('https://unpkg.com/stockfish@16/src/stockfish.wasm.js');
+    const game = new Chess();
+    let board = null;
+    let engine = null;
     let aiThinking = false;
 
-    engine.onmessage = function(event) {
-      if (event.data.startsWith('bestmove')) {
-        let move = event.data.split(' ')[1];
+    // تحميل Stockfish
+    engine = STOCKFISH();
+    engine.onmessage = (event) => {
+      const line = event && typeof event === "object" ? event.data : event;
+      if (line && line.startsWith('bestmove')) {
+        const move = line.split(' ')[1];
         game.move(move);
         board.position(game.fen());
         updateStatus();
         aiThinking = false;
+        hideLoading();
       }
     };
 
-    engine.postMessage('uci');
-    engine.postMessage('setoption name Skill Level value 20'); // أقصى قوة
-    engine.postMessage('isready');
+    function showLoading(msg = 'الـAI بيفكر بعمق رهيب...') {
+      document.getElementById('loading').textContent = msg;
+      document.getElementById('loading').style.display = 'block';
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+    }
 
     const config = {
       draggable: true,
       position: 'start',
-      onDrop: onDrop,
+      onDrop: handleMove,
+      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
     };
 
-    function startGame(side) {
-      game.reset();
+    function initBoard() {
+      hideLoading();
+      document.getElementById('board').style.display = 'block';
+      if (board) board.destroy();
       board = Chessboard('board', config);
-      board.position('start');
-      document.getElementById('status').innerText = 'جاري اللعب...';
-      if (side === 'black') aiMove();
+      board.position(game.fen());
+      updateStatus();
     }
 
-    function onDrop(source, target) {
+    function startGame(playerColor) {
+      game.reset();
+      initBoard();
+      if (playerColor === 'black') aiMove();
+    }
+
+    function handleMove(source, target) {
       if (aiThinking) return 'snapback';
-      let move = game.move({ from: source, to: target, promotion: 'q' });
+      const move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q'
+      });
       if (move === null) return 'snapback';
-      board.position(game.fen());
       updateStatus();
       aiMove();
     }
 
     function aiMove() {
+      if (game.game_over()) return;
       aiThinking = true;
+      showLoading('الـAI بيحسب حركة قاتلة... (صعب جدًا!)');
       engine.postMessage('position fen ' + game.fen());
-      engine.postMessage('go depth 30'); // عمق عالي = صعوبة رهيبة (ياخد ثواني)
+      engine.postMessage('go depth 35'); // صعوبة مجنونة
     }
 
     function updateStatus() {
-      if (game.in_checkmate()) document.getElementById('status').innerText = 'كش مات! انتهت اللعبة';
-      else if (game.in_draw()) document.getElementById('status').innerText = 'تعادل!';
-      else document.getElementById('status').innerText = game.turn() === 'w' ? 'دور الأبيض' : 'دور الأسود';
+      let status = '';
+      if (game.in_checkmate()) status = '🎉 كش مات! انتهت اللعبة';
+      else if (game.in_draw()) status = '🤝 تعادل';
+      else if (game.in_stalemate()) status = 'ستالمات';
+      else status = game.turn() === 'w' ? 'دورك (أبيض)' : 'دور الـAI (أسود)';
+      document.getElementById('status').innerText = status;
     }
 
+    // أوامر Stockfish
+    engine.postMessage('uci');
+    engine.postMessage('setoption name Skill Level value 20');
+    engine.postMessage('setoption name Threads value 4');
+    engine.postMessage('isready');
+
+    // أزرار
     document.getElementById('startWhite').onclick = () => startGame('white');
     document.getElementById('startBlack').onclick = () => startGame('black');
     document.getElementById('newGame').onclick = () => startGame(game.turn() === 'w' ? 'white' : 'black');
 
-    startGame('white'); // ابدأ تلقائي
+    // ابدأ أوتوماتيك بعد التحميل
+    setTimeout(() => {
+      initBoard();
+      startGame('white');
+    }, 4000); // وقت كافي للتحميل الأول
   </script>
 </body>
 </html>
+Commit message: "Full interactive chess with super strong AI
