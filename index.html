@@ -1,127 +1,41 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>شطرنج ضد AI قوي جدًا</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-  <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
-  <style>
-    body { background:#000; color:#fff; text-align:center; font-family:Arial; padding:10px; margin:0; }
-    h1 { font-size:24px; margin:10px; }
-    #board { width:95vw; max-width:500px; margin:20px auto; }
-    button { padding:15px 30px; font-size:20px; margin:10px; background:#0066ff; color:#fff; border:none; border-radius:10px; cursor:pointer; }
-    #status { font-size:22px; margin:20px; font-weight:bold; }
-    #loading { color:#ff0; font-size:18px; margin:20px; }
-  </style>
-</head>
-<body>
-  <h1>♟️ شطرنج ضد AI قوي جدًا جدًا ♟️</h1>
-  <p>Stockfish - أقوى محرك شطرنج في العالم (صعب على أي بشر!)</p>
-  <div id="loading">جاري تحميل الـAI... ثواني بس (أول مرة)</div>
-  <div id="board" style="display:none;"></div>
-  <button onclick="startAsWhite()">العب أبيض (أنت تبدأ)</button>
-  <button onclick="startAsBlack()">العب أسود (AI يبدأ)</button>
-  <button onclick="newGame()">لعبة جديدة</button>
-  <div id="status">اضغط زر للبداية</div>
+<script>
+  const game = new Chess();
+  const engine = new Worker("stockfish.js");
 
-  <script>
-    const game = new Chess();
-    let board = null;
-    let engine = null;
-    let playerColor = 'w';
+  engine.postMessage("uci");
+  engine.postMessage("isready");
 
-    // تحميل Stockfish
-    engine = STOCKFISH();
-    engine.onmessage = (event) => {
-      const line = event.data || event;
-      if (line.includes('bestmove')) {
-        const move = line.split(' ')[1];
-        if (move && move !== '(none)') {
-          game.move(move);
-          board.position(game.fen());
-          updateStatus();
-          document.getElementById('loading').style.display = 'none';
-        }
-      }
-    };
+  const board = Chessboard('board', {
+    draggable: true,
+    position: 'start',
 
-    engine.postMessage('uci');
-    engine.postMessage('setoption name Skill Level value 20');
-    engine.postMessage('setoption name Threads value 4');
-    engine.postMessage('ucinewgame');
-    engine.postMessage('isready');
+    onDrop: function (source, target) {
+      const move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q'
+      });
 
-    const config = {
-      draggable: true,
-      position: 'start',
-      onDrop: (source, target) => {
-        const move = game.move({
-          from: source,
-          to: target,
+      if (move === null) return 'snapback';
+
+      window.setTimeout(makeAIMove, 250);
+    }
+  });
+
+  function makeAIMove() {
+    engine.postMessage("position fen " + game.fen());
+    engine.postMessage("go depth 15");
+
+    engine.onmessage = function (e) {
+      if (e.data.startsWith("bestmove")) {
+        const move = e.data.split(" ")[1];
+        game.move({
+          from: move.substring(0, 2),
+          to: move.substring(2, 4),
           promotion: 'q'
         });
-        if (move === null) return 'snapback';
-        updateStatus();
-        aiTurn();
+        board.position(game.fen());
       }
     };
-
-    function initBoard() {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('board').style.display = 'block';
-      if (board) board.destroy();
-      board = Chessboard('board', config);
-      board.position(game.fen());
-    }
-
-    function aiTurn() {
-      if (game.game_over()) {
-        updateStatus();
-        return;
-      }
-      document.getElementById('loading').textContent = 'الـAI بيحسب حركة قوية جدًا...';
-      document.getElementById('loading').style.display = 'block';
-      engine.postMessage('position fen ' + game.fen());
-      engine.postMessage('go depth 30'); // صعوبة مجنونة
-    }
-
-    function updateStatus() {
-      let status = '';
-      if (game.in_checkmate()) {
-        status = game.turn() === playerColor ? 'كش مات! خسرت 😭' : 'كش مات! فزت 🎉';
-      } else if (game.in_draw()) {
-        status = 'تعادل 🤝';
-      } else {
-        status = game.turn() === 'w' ? 'دور الأبيض' : 'دور الأسود';
-      }
-      document.getElementById('status').innerText = status;
-    }
-
-    function startAsWhite() {
-      playerColor = 'w';
-      newGame();
-    }
-
-    function startAsBlack() {
-      playerColor = 'b';
-      newGame();
-      aiTurn();
-    }
-
-    function newGame() {
-      game.reset();
-      initBoard();
-      updateStatus();
-    }
-
-    // ابدأ تلقائي بعد تحميل Stockfish
-    setTimeout(() => {
-      initBoard();
-      startAsWhite();
-    }, 4000);
-  </script>
-</body>
-</html>
+  }
+</script>
