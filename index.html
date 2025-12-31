@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شطرنج قوي جداً</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
+  <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
+  <style>
+    body { background: #121212; color: white; text-align: center; font-family: Arial; }
+    #board { width: 90vw; max-width: 500px; margin: 20px auto; }
+    button { padding: 10px 20px; font-size: 18px; margin: 10px; background: #1E88E5; color: white; border: none; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>♟️ شطرنج ضد AI قوي جداً جداً ♟️</h1>
+  <p>الـAI ده Stockfish (أقوى محرك في العالم، صعب على المحترفين!)</p>
+  <div id="board"></div>
+  <button id="startWhite">العب أبيض (أنت تبدأ)</button>
+  <button id="startBlack">العب أسود (AI يبدأ)</button>
+  <button id="newGame">لعبة جديدة</button>
+  <p id="status"></p>
+
+  <script>
+    let game = new Chess();
+    let board;
+    let engine = new Worker('https://unpkg.com/stockfish@16/src/stockfish.wasm.js');
+    let aiThinking = false;
+
+    engine.onmessage = function(event) {
+      if (event.data.startsWith('bestmove')) {
+        let move = event.data.split(' ')[1];
+        game.move(move);
+        board.position(game.fen());
+        updateStatus();
+        aiThinking = false;
+      }
+    };
+
+    engine.postMessage('uci');
+    engine.postMessage('setoption name Skill Level value 20'); // أقصى قوة
+    engine.postMessage('isready');
+
+    const config = {
+      draggable: true,
+      position: 'start',
+      onDrop: onDrop,
+    };
+
+    function startGame(side) {
+      game.reset();
+      board = Chessboard('board', config);
+      board.position('start');
+      document.getElementById('status').innerText = 'جاري اللعب...';
+      if (side === 'black') aiMove();
+    }
+
+    function onDrop(source, target) {
+      if (aiThinking) return 'snapback';
+      let move = game.move({ from: source, to: target, promotion: 'q' });
+      if (move === null) return 'snapback';
+      board.position(game.fen());
+      updateStatus();
+      aiMove();
+    }
+
+    function aiMove() {
+      aiThinking = true;
+      engine.postMessage('position fen ' + game.fen());
+      engine.postMessage('go depth 30'); // عمق عالي = صعوبة رهيبة (ياخد ثواني)
+    }
+
+    function updateStatus() {
+      if (game.in_checkmate()) document.getElementById('status').innerText = 'كش مات! انتهت اللعبة';
+      else if (game.in_draw()) document.getElementById('status').innerText = 'تعادل!';
+      else document.getElementById('status').innerText = game.turn() === 'w' ? 'دور الأبيض' : 'دور الأسود';
+    }
+
+    document.getElementById('startWhite').onclick = () => startGame('white');
+    document.getElementById('startBlack').onclick = () => startGame('black');
+    document.getElementById('newGame').onclick = () => startGame(game.turn() === 'w' ? 'white' : 'black');
+
+    startGame('white'); // ابدأ تلقائي
+  </script>
+</body>
+</html>
