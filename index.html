@@ -1,165 +1,125 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zoge Chess</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-    <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body { background:#121212; color:#fff; font-family:Arial; text-align:center; margin:0; padding:20px; }
-        #profile { background:#1e1e1e; padding:20px; margin:20px auto; max-width:500px; border-radius:15px; }
-        #points { font-size:3em; color:#77c353; }
-        button { background:#77c353; padding:15px 30px; font-size:1.5em; border-radius:12px; margin:15px; cursor:pointer; }
-        #board { width:min(95vw,500px); margin:20px auto; }
-        #status { font-size:1.8em; margin:20px; }
-        #loading { color:#ffeb3b; font-size:1.6em; margin:20px; display:none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zoge Chess</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script src="https://unpkg.com/stockfish@16/stockfish.js"></script>
+
+<style>
+body { background:#121212; color:#fff; font-family:Arial; text-align:center }
+#board { width:90vw; max-width:480px; margin:20px auto }
+button { padding:15px 30px; font-size:18px; margin:10px; cursor:pointer }
+#status { font-size:20px; margin:15px }
+#loading { color:#ff0; display:none }
+</style>
 </head>
+
 <body>
-    <div id="profile">
-        <h2>مرحبا يا <span id="player-name">لاعب</span>!</h2>
-        <div id="points">0</div>
-        <div>فوز: <span id="wins">0</span> | خسارة: <span id="losses">0</span> | تعادل: <span id="draws">0</span></div>
-    </div>
 
-    <div id="game-area">
-        <h2>شطرنج ضد AI قوي جدًا</h2>
-        <div id="loading">جاري تحميل الـAI... (ثواني بس)</div>
-        <div id="board"></div>
-        <div id="status">اضغط زر للبداية</div>
-        <button onclick="startNewGame('w')">العب أبيض (أنت تبدأ)</button>
-        <button onclick="startNewGame('b')">العب أسود (AI يبدأ)</button>
-    </div>
+<h2>♟️ شطرنج ضد AI مستحيل</h2>
+<div id="loading">الذكاء الاصطناعي يفكر...</div>
+<div id="board"></div>
+<div id="status">اضغط للبدء</div>
 
-    <audio id="move-sound" src="https://assets.mixkit.co/sfx/download/mixkit-chess-piece-move-2107.mp3"></audio>
-    <audio id="win-sound" src="https://assets.mixkit.co/sfx/download/mixkit-winning-chimes-2015.mp3"></audio>
+<button onclick="startGame('w')">العب أبيض</button>
+<button onclick="startGame('b')">العب أسود</button>
 
-    <script>
-        const supabaseUrl = 'https://jcgdxtnspmqwunzfkdqa.supabase.co';
-        const supabaseKey = 'sb_publishable_yRrI83fceQxrCpug9LOIRg_GZoKR_d4';
-        const { createClient } = supabase;
-        const supabase = createClient(supabaseUrl, supabaseKey);
+<script>
+let game = new Chess()
+let board = null
+let engine = null
+let playerColor = 'w'
+let engineReady = false
 
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+// تشغيل Stockfish
+function initEngine() {
+  engine = new Worker("https://unpkg.com/stockfish@16/stockfish.js")
 
-        const user = tg.initDataUnsafe?.user || { id: 123456789, first_name: 'لاعب' };
-        document.getElementById('player-name').textContent = user.first_name || 'لاعب';
+  engine.onmessage = (e) => {
+    const line = e.data
+    if (line === 'uciok') engineReady = true
 
-        let game = new Chess();
-        let board;
-        let engine;
-        let playerColor = 'w';
+    if (line.startsWith('bestmove')) {
+      const move = line.split(' ')[1]
+      game.move(move)
+      board.position(game.fen())
+      document.getElementById('loading').style.display = 'none'
+      document.getElementById('status').textContent = 'دورك'
+      if (game.game_over()) endGame()
+    }
+  }
 
-        async function loadProfile() {
-            let { data } = await supabase.from('players').select('*').eq('telegram_id', user.id).single();
-            if (!data) {
-                const { data: newData } = await supabase.from('players').insert({
-                    telegram_id: user.id,
-                    first_name: user.first_name,
-                    username: user.username || ''
-                }).select().single();
-                data = newData;
-            }
-            document.getElementById('points').textContent = data.points || 0;
-            document.getElementById('wins').textContent = data.wins || 0;
-            document.getElementById('losses').textContent = data.losses || 0;
-            document.getElementById('draws').textContent = data.draws || 0;
-        }
+  engine.postMessage('uci')
+  engine.postMessage('setoption name Skill Level value 20')
+  engine.postMessage('setoption name Hash value 256')
+  engine.postMessage('setoption name Threads value 4')
+  engine.postMessage('setoption name Contempt value 100')
+}
 
-        async function updateStats(result) {
-            let pointsChange = result === 'win' ? 10 : result === 'loss' ? -5 : 2;
-            let field = result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws';
+function initBoard() {
+  if (board) board.destroy()
 
-            await supabase.from('players').update({
-                points: supabase.raw('points + ?', pointsChange),
-                [field]: supabase.raw(field + ' + 1')
-            }).eq('telegram_id', user.id);
+  board = Chessboard('board', {
+    draggable: true,
+    position: game.fen(),
+    orientation: playerColor === 'w' ? 'white' : 'black',
 
-            loadProfile();
-        }
+    onDragStart: (source) => {
+      if (game.game_over()) return false
+      if (game.turn() !== playerColor) return false
+      if (game.turn() === 'w' && source[0] !== 'w') return false
+      if (game.turn() === 'b' && source[0] !== 'b') return false
+    },
 
-        function initEngine() {
-            engine = STOCKFISH();
-            engine.onmessage = (event) => {
-                const line = event.data || event;
-                if (line.includes('bestmove')) {
-                    const move = line.split(' ')[1];
-                    if (move && move !== '(none)') {
-                        game.move(move);
-                        board.position(game.fen());
-                        document.getElementById('loading').style.display = 'none';
-                        document.getElementById('status').textContent = 'دورك!';
-                        moveSound.play();
-                        if (game.game_over()) endGame();
-                    }
-                }
-            };
-            engine.postMessage('uci');
-            engine.postMessage('setoption name Skill Level value 20');
-            engine.postMessage('setoption name Threads value 4');
-        }
+    onDrop: (source, target) => {
+      const move = game.move({ from: source, to: target, promotion: 'q' })
+      if (!move) return 'snapback'
 
-        function initBoard() {
-            if (board) board.destroy();
-            board = Chessboard('board', {
-                draggable: true,
-                position: game.fen(),
-                onDrop: (source, target) => {
-                    const move = game.move({ from: source, to: target, promotion: 'q' });
-                    if (move === null) return 'snapback';
-                    moveSound.play();
-                    if (game.game_over()) {
-                        endGame();
-                        return;
-                    }
-                    document.getElementById('loading').style.display = 'block';
-                    document.getElementById('status').textContent = 'الـAI بيفكر...';
-                    engine.postMessage('position fen ' + game.fen());
-                    engine.postMessage('go depth 30');
-                }
-            });
-        }
+      if (game.game_over()) return endGame()
 
-        function endGame() {
-            if (game.in_checkmate()) {
-                const result = game.turn() === playerColor ? 'loss' : 'win';
-                updateStats(result);
-                document.getElementById('status').textContent = result === 'win' ? 'فزت! +10 نقاط 🎉' : 'خسرت! -5 نقاط';
-                winSound.play();
-            } else if (game.in_draw()) {
-                updateStats('draw');
-                document.getElementById('status').textContent = 'تعادل! +2 نقاط';
-            }
-        }
+      document.getElementById('loading').style.display = 'block'
+      document.getElementById('status').textContent = 'الذكاء الاصطناعي يفكر...'
 
-        function startNewGame(color) {
-            playerColor = color;
-            game = new Chess();
-            initBoard();
-            document.getElementById('status').textContent = 'دورك!';
-            document.getElementById('loading').style.display = 'none';
-            if (color === 'b') {
-                document.getElementById('loading').style.display = 'block';
-                engine.postMessage('position fen ' + game.fen());
-                engine.postMessage('go depth 30');
-            }
-        }
+      engine.postMessage('position fen ' + game.fen())
+      engine.postMessage('go depth 40')
+    }
+  })
+}
 
-        const moveSound = document.getElementById('move-sound');
-        const winSound = document.getElementById('win-sound');
+function startGame(color) {
+  if (!engineReady) {
+    alert('الـ AI لم يجهز بعد، انتظر ثانيتين')
+    return
+  }
 
-        // ابدأ
-        initEngine();
-        setTimeout(() => {
-            document.getElementById('loading').style.display = 'none';
-            loadProfile();
-        }, 5000); // وقت كافي لتحميل Stockfish
-    </script>
+  playerColor = color
+  game.reset()
+  initBoard()
+  document.getElementById('status').textContent = 'بدأت اللعبة'
+
+  if (playerColor === 'b') {
+    document.getElementById('loading').style.display = 'block'
+    engine.postMessage('position startpos')
+    engine.postMessage('go depth 40')
+  }
+}
+
+function endGame() {
+  if (game.in_checkmate()) {
+    document.getElementById('status').textContent =
+      game.turn() === playerColor ? 'خسرت 😈' : 'فزت؟ مستحيل 😳'
+  } else {
+    document.getElementById('status').textContent = 'تعادل'
+  }
+}
+
+initEngine()
+</script>
+
 </body>
 </html>
