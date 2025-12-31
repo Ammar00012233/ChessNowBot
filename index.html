@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شطرنج قوي جداً</title>
+  <style>
+    body { background: #000; color: #fff; text-align: center; font-family: Arial; margin: 0; padding: 10px; }
+    h1 { font-size: 24px; }
+    #board { width: 95vw; max-width: 500px; margin: 20px auto; aspect-ratio: 1/1; display: grid; grid-template-columns: repeat(8, 1fr); border: 4px solid #fff; border-radius: 10px; overflow: hidden; }
+    .square { background: #eee; font-size: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .square.dark { background: #888; }
+    .square.highlight { background: #ff0 !important; }
+    .square.possible { background: #0f0 !important; opacity: 0.7; }
+    button { padding: 15px; font-size: 20px; margin: 10px; background: #00f; color: #fff; border: none; border-radius: 10px; }
+    #status { font-size: 22px; margin: 20px; }
+  </style>
+  <script src="https://unpkg.com/chess.js/chess.min.js"></script>
+</head>
+<body>
+  <h1>♟️ شطرنج ضد AI صعب جداً ♟️</h1>
+  <p>اضغط على قطعك → الحركات الخضراء → اضغط الوجهة</p>
+  <div id="board"></div>
+  <button onclick="newGame()">لعبة جديدة</button>
+  <button onclick="playAsWhite()">العب أبيض</button>
+  <button onclick="playAsBlack()">العب أسود</button>
+  <div id="status">ابدأ اللعب!</div>
+
+  <script>
+    const chess = new Chess();
+    const boardDiv = document.getElementById('board');
+    let selected = null;
+    let playerSide = 'w'; // white by default
+
+    function createBoard() {
+      boardDiv.innerHTML = '';
+      for (let i = 7; i >= 0; i--) {
+        for (let j = 0; j < 8; j++) {
+          const sq = document.createElement('div');
+          sq.className = 'square ' + ((i + j) % 2 ? 'dark' : '');
+          sq.dataset.pos = String.fromCharCode(97 + j) + (i + 1);
+          sq.onclick = () => clickSquare(sq.dataset.pos);
+          boardDiv.appendChild(sq);
+        }
+      }
+      updateBoard();
+    }
+
+    function updateBoard() {
+      const pieces = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟', K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' };
+      document.querySelectorAll('.square').forEach(sq => {
+        const piece = chess.get(sq.dataset.pos);
+        sq.textContent = piece ? pieces[piece.type.toUpperCase()] + (piece.color === 'b' ? '' : '') : '';
+        sq.textContent = piece ? (piece.color === 'w' ? pieces[piece.type.toUpperCase()] : pieces[piece.type]) : '';
+      });
+    }
+
+    function clickSquare(pos) {
+      if (chess.game_over()) return;
+      if (chess.turn() !== playerSide) return aiMove(); // AI turn if not player
+
+      if (selected === pos) {
+        selected = null;
+        clearHighlights();
+        return;
+      }
+
+      if (selected) {
+        const move = chess.move({ from: selected, to: pos, promotion: 'q' });
+        if (move) {
+          updateBoard();
+          clearHighlights();
+          updateStatus();
+          setTimeout(aiMove, 500);
+        }
+        selected = null;
+        clearHighlights();
+      } else {
+        const piece = chess.get(pos);
+        if (piece && piece.color === playerSide) {
+          selected = pos;
+          clearHighlights();
+          document.querySelector(`[data-pos="${pos}"]`).classList.add('highlight');
+          chess.moves({ square: pos, verbose: true }).forEach(m => {
+            document.querySelector(`[data-pos="${m.to}"]`).classList.add('possible');
+          });
+        }
+      }
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.square').forEach(sq => sq.classList.remove('highlight', 'possible'));
+    }
+
+    function aiMove() {
+      if (chess.game_over()) return;
+      // Simple random AI for now (strong later if needed)
+      const moves = chess.moves();
+      const randomMove = moves[Math.floor(Math.random() * moves.length)];
+      chess.move(randomMove);
+      updateBoard();
+      updateStatus();
+    }
+
+    function updateStatus() {
+      if (chess.in_checkmate()) document.getElementById('status').innerText = 'كش مات! ' + (chess.turn() === playerSide ? 'خسرت' : 'فزت');
+      else if (chess.in_draw()) document.getElementById('status').innerText = 'تعادل';
+      else document.getElementById('status').innerText = chess.turn() === 'w' ? 'دور الأبيض' : 'دور الأسود';
+    }
+
+    function newGame() {
+      chess.reset();
+      createBoard();
+      updateStatus();
+    }
+
+    function playAsWhite() {
+      playerSide = 'w';
+      newGame();
+    }
+
+    function playAsBlack() {
+      playerSide = 'b';
+      newGame();
+      aiMove();
+    }
+
+    createBoard();
+    updateStatus();
+  </script>
+</body>
+</html>
