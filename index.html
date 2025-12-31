@@ -1,96 +1,127 @@
-html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>شطرنج ضد الكمبيوتر</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شطرنج ضد AI قوي جدًا</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <script src="https://unpkg.com/stockfish@16/src/stockfish.wasm.js"></script>
   <style>
-    body { display: flex; flex-direction: column; align-items: center; }
-    #board { width: 400px; margin: 20px; }
-    #status { margin: 10px; font-size: 18px; }
+    body { background:#000; color:#fff; text-align:center; font-family:Arial; padding:10px; margin:0; }
+    h1 { font-size:24px; margin:10px; }
+    #board { width:95vw; max-width:500px; margin:20px auto; }
+    button { padding:15px 30px; font-size:20px; margin:10px; background:#0066ff; color:#fff; border:none; border-radius:10px; cursor:pointer; }
+    #status { font-size:22px; margin:20px; font-weight:bold; }
+    #loading { color:#ff0; font-size:18px; margin:20px; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/stockfish/stockfish.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 </head>
 <body>
-  <h2>شطرنج ضد الكمبيوتر</h2>
-  <div id="board"></div>
-  <div id="status"></div>
-  <button onclick="startNewGame()">جيم جديد</button>
+  <h1>♟️ شطرنج ضد AI قوي جدًا جدًا ♟️</h1>
+  <p>Stockfish - أقوى محرك شطرنج في العالم (صعب على أي بشر!)</p>
+  <div id="loading">جاري تحميل الـAI... ثواني بس (أول مرة)</div>
+  <div id="board" style="display:none;"></div>
+  <button onclick="startAsWhite()">العب أبيض (أنت تبدأ)</button>
+  <button onclick="startAsBlack()">العب أسود (AI يبدأ)</button>
+  <button onclick="newGame()">لعبة جديدة</button>
+  <div id="status">اضغط زر للبداية</div>
+
   <script>
-    var board = null;
-    var game = new Chess();
-    var engine = STOCKFISH();
-    var statusEl = document.getElementById('status');
+    const game = new Chess();
+    let board = null;
+    let engine = null;
+    let playerColor = 'w';
 
-    function onDragStart (source, piece, position, orientation) {
-      if (game.game_over() || piece.search(/^b/) !== -1) {
-        return false;
-      }
-    }
-
-    function makeEngineMove () {
-      engine.postMessage('position fen ' + game.fen());
-      engine.postMessage('go depth 15');
-    }
-
-    engine.onmessage = function(event) {
-      var line = event && event.data ? event.data : event;
-      if (typeof line === "string" && line.startsWith('bestmove')) {
-        var move = line.split(' ')[1];
+    // تحميل Stockfish
+    engine = STOCKFISH();
+    engine.onmessage = (event) => {
+      const line = event.data || event;
+      if (line.includes('bestmove')) {
+        const move = line.split(' ')[1];
         if (move && move !== '(none)') {
-          game.move({ from: move.substring(0,2), to: move.substring(2,4), promotion: 'q' });
+          game.move(move);
           board.position(game.fen());
           updateStatus();
+          document.getElementById('loading').style.display = 'none';
         }
       }
     };
 
-    function onDrop (source, target) {
-      var move = game.move({
-        from: source,
-        to: target,
-        promotion: 'q'
-      });
+    engine.postMessage('uci');
+    engine.postMessage('setoption name Skill Level value 20');
+    engine.postMessage('setoption name Threads value 4');
+    engine.postMessage('ucinewgame');
+    engine.postMessage('isready');
 
-      if (move === null) return 'snapback';
-
-      updateStatus();
-      window.setTimeout(makeEngineMove, 250);
-    }
-
-    function updateStatus () {
-      var status = '';
-      if (game.in_checkmate()) {
-        status = 'كش مات! انتهت اللعبة.';
-      } else if (game.in_draw()) {
-        status = 'تعادل!';
-      } else {
-        status = (game.turn() === 'w' ? 'دورك' : 'دور الكمبيوتر');
-        if (game.in_check()) {
-          status += ' — كش!';
-        }
-      }
-      statusEl.innerHTML = status;
-    }
-
-    function startNewGame() {
-      game.reset();
-      board.position('start');
-      updateStatus();
-    }
-
-    var config = {
+    const config = {
       draggable: true,
       position: 'start',
-      onDragStart: onDragStart,
-      onDrop: onDrop,
-      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+      onDrop: (source, target) => {
+        const move = game.move({
+          from: source,
+          to: target,
+          promotion: 'q'
+        });
+        if (move === null) return 'snapback';
+        updateStatus();
+        aiTurn();
+      }
     };
-    board = Chessboard('board', config);
-    updateStatus();
+
+    function initBoard() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('board').style.display = 'block';
+      if (board) board.destroy();
+      board = Chessboard('board', config);
+      board.position(game.fen());
+    }
+
+    function aiTurn() {
+      if (game.game_over()) {
+        updateStatus();
+        return;
+      }
+      document.getElementById('loading').textContent = 'الـAI بيحسب حركة قوية جدًا...';
+      document.getElementById('loading').style.display = 'block';
+      engine.postMessage('position fen ' + game.fen());
+      engine.postMessage('go depth 30'); // صعوبة مجنونة
+    }
+
+    function updateStatus() {
+      let status = '';
+      if (game.in_checkmate()) {
+        status = game.turn() === playerColor ? 'كش مات! خسرت 😭' : 'كش مات! فزت 🎉';
+      } else if (game.in_draw()) {
+        status = 'تعادل 🤝';
+      } else {
+        status = game.turn() === 'w' ? 'دور الأبيض' : 'دور الأسود';
+      }
+      document.getElementById('status').innerText = status;
+    }
+
+    function startAsWhite() {
+      playerColor = 'w';
+      newGame();
+    }
+
+    function startAsBlack() {
+      playerColor = 'b';
+      newGame();
+      aiTurn();
+    }
+
+    function newGame() {
+      game.reset();
+      initBoard();
+      updateStatus();
+    }
+
+    // ابدأ تلقائي بعد تحميل Stockfish
+    setTimeout(() => {
+      initBoard();
+      startAsWhite();
+    }, 4000);
   </script>
 </body>
 </html>
