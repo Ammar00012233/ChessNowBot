@@ -31,8 +31,8 @@
         <div id="loading">جاري تحميل الـAI... (ثواني بس)</div>
         <div id="board"></div>
         <div id="status">اضغط زر للبداية</div>
-        <button onclick="newGame('w')">العب أبيض (أنت تبدأ)</button>
-        <button onclick="newGame('b')">العب أسود (AI يبدأ)</button>
+        <button onclick="startNewGame('w')">العب أبيض (أنت تبدأ)</button>
+        <button onclick="startNewGame('b')">العب أسود (AI يبدأ)</button>
     </div>
 
     <audio id="move-sound" src="https://assets.mixkit.co/sfx/download/mixkit-chess-piece-move-2107.mp3"></audio>
@@ -50,6 +50,11 @@
 
         const user = tg.initDataUnsafe?.user || { id: 123456789, first_name: 'لاعب' };
         document.getElementById('player-name').textContent = user.first_name || 'لاعب';
+
+        let game = new Chess();
+        let board;
+        let engine;
+        let playerColor = 'w';
 
         async function loadProfile() {
             let { data } = await supabase.from('players').select('*').eq('telegram_id', user.id).single();
@@ -79,34 +84,32 @@
             loadProfile();
         }
 
-        const game = new Chess();
-        let board;
-        let engine = STOCKFISH();
-        let playerColor = 'w';
-
-        engine.onmessage = (event) => {
-            const line = event.data || event;
-            if (line.includes('bestmove')) {
-                const move = line.split(' ')[1];
-                if (move && move !== '(none)') {
-                    game.move(move);
-                    board.position(game.fen());
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('status').textContent = 'دورك!';
-                    moveSound.play();
-                    if (game.game_over()) endGame();
+        function initEngine() {
+            engine = STOCKFISH();
+            engine.onmessage = (event) => {
+                const line = event.data || event;
+                if (line.includes('bestmove')) {
+                    const move = line.split(' ')[1];
+                    if (move && move !== '(none)') {
+                        game.move(move);
+                        board.position(game.fen());
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('status').textContent = 'دورك!';
+                        moveSound.play();
+                        if (game.game_over()) endGame();
+                    }
                 }
-            }
-        };
-
-        engine.postMessage('uci');
-        engine.postMessage('setoption name Skill Level value 20');
-        engine.postMessage('setoption name Threads value 4');
+            };
+            engine.postMessage('uci');
+            engine.postMessage('setoption name Skill Level value 20');
+            engine.postMessage('setoption name Threads value 4');
+        }
 
         function initBoard() {
+            if (board) board.destroy();
             board = Chessboard('board', {
                 draggable: true,
-                position: 'start',
+                position: game.fen(),
                 onDrop: (source, target) => {
                     const move = game.move({ from: source, to: target, promotion: 'q' });
                     if (move === null) return 'snapback';
@@ -121,7 +124,6 @@
                     engine.postMessage('go depth 30');
                 }
             });
-            document.getElementById('loading').style.display = 'none';
         }
 
         function endGame() {
@@ -136,10 +138,10 @@
             }
         }
 
-        function newGame(color) {
+        function startNewGame(color) {
             playerColor = color;
-            game.reset();
-            board.position('start');
+            game = new Chess();
+            initBoard();
             document.getElementById('status').textContent = 'دورك!';
             document.getElementById('loading').style.display = 'none';
             if (color === 'b') {
@@ -152,11 +154,12 @@
         const moveSound = document.getElementById('move-sound');
         const winSound = document.getElementById('win-sound');
 
-        // ابدأ بعد تحميل Stockfish
+        // ابدأ
+        initEngine();
         setTimeout(() => {
-            initBoard();
+            document.getElementById('loading').style.display = 'none';
             loadProfile();
-        }, 4000);
+        }, 5000); // وقت كافي لتحميل Stockfish
     </script>
 </body>
 </html>
