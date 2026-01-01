@@ -2,45 +2,122 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شطرنج المحترفين</title>
-    <!-- مكتبات اللوحة والمنطق -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>شطرنج المحترفين أونلاين</title>
+    
+    <!-- مكتبات الشطرنج -->
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
     <style>
-        body { font-family: sans-serif; text-align: center; background: #2c3e50; color: white; }
-        #board { width: 400px; margin: 20px auto; }
-        .controls { margin-top: 20px; }
-        button { padding: 10px 20px; cursor: pointer; }
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #27ae60;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* منع سحب الصفحة في الموبايل */
+            touch-action: none;
+            overflow: hidden;
+        }
+        #board {
+            width: 95vw;
+            max-width: 450px;
+            margin: 10px auto;
+            touch-action: none; /* حل مشكلة تحرك الشاشة */
+        }
+        .controls {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 10px;
+            width: 90vw;
+            max-width: 450px;
+            text-align: center;
+        }
+        .highlight-hint {
+            box-shadow: inset 0 0 3px 3px rgba(39, 174, 96, 0.7);
+            border-radius: 50%;
+        }
+        button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #219150; }
+        .status-box {
+            margin: 10px 0;
+            padding: 10px;
+            background: #34495e;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
 
-    <h1 id="title">شطرنج المحترفين</h1>
+    <h2 id="title">شطرنج المحترفين</h2>
+
     <div id="board"></div>
-    
+
     <div class="controls">
-        <button onclick="setLanguage('ar')">العربية</button>
-        <button onclick="setLanguage('en')">English</button>
-        <p id="status">الحالة: دور الأبيض</p>
+        <div class="status-box">
+            <div id="status">الدور على: الأبيض</div>
+        </div>
+        
+        <button onclick="newGame()" id="resetBtn">جيم جديد</button>
+        <button onclick="toggleAI()" id="aiBtn">اللعب ضد: الكمبيوتر (مفعل)</button>
+        <button onclick="changeLang()">English</button>
     </div>
 
     <script>
         var board = null;
         var game = new Chess();
         var $status = $('#status');
+        var aiEnabled = true;
+        var currentLang = 'ar';
+
+        // نصوص اللغات
+        const i18n = {
+            ar: { title: "شطرنج المحترفين", white: "الأبيض", black: "الأسود", win: "فاز!", draw: "تعادل", aiOn: "اللعب ضد: الكمبيوتر (مفعل)", aiOff: "اللعب ضد: شخص آخر", reset: "جيم جديد" },
+            en: { title: "Pro Chess", white: "White", black: "Black", win: "Wins!", draw: "Draw", aiOn: "Mode: vs Computer", aiOff: "Mode: vs Human", reset: "New Game" }
+        };
 
         function onDragStart (source, piece, position, orientation) {
             if (game.game_over()) return false;
+
+            // لا تسمح بتحريك قطع الخصم
             if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
                 (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
                 return false;
             }
+
+            // --- ميزة إظهار الحركات المتاحة ---
+            var moves = game.moves({ square: source, verbose: true });
+            if (moves.length === 0) return;
+
+            moves.forEach(m => {
+                $('#board .square-' + m.to).addClass('highlight-hint');
+            });
         }
 
         function onDrop (source, target) {
+            // إزالة التلميحات عند ترك القطعة
+            $('#board .square-55d6').removeClass('highlight-hint');
+            $('.square-55d6').removeClass('highlight-hint');
+
             var move = game.move({
                 from: source,
                 to: target,
@@ -48,21 +125,65 @@
             });
 
             if (move === null) return 'snapback';
+
+            updateStatus();
+
+            // إذا كان دور الكمبيوتر مفعل
+            if (aiEnabled && !game.game_over()) {
+                window.setTimeout(makeBestMove, 250);
+            }
+        }
+
+        function onSnapEnd () {
+            board.position(game.fen());
+        }
+
+        // --- محرك الذكاء الاصطناعي (AI) ---
+        function makeBestMove() {
+            var moves = game.moves();
+            if (moves.length === 0) return;
+
+            // ذكاء اصطناعي بسيط: يختار حركة عشوائية حالياً 
+            // (يمكنك هنا وضع كود Stockfish.js للحصول على صعوبة مستحيلة)
+            var randomIdx = Math.floor(Math.random() * moves.length);
+            game.move(moves[randomIdx]);
+            board.position(game.fen());
             updateStatus();
         }
 
         function updateStatus () {
             var status = '';
-            var moveColor = (game.turn() === 'w') ? 'الأبيض' : 'الأسود';
+            var moveColor = (game.turn() === 'w') ? i18n[currentLang].white : i18n[currentLang].black;
 
             if (game.in_checkmate()) {
-                status = 'انتهت اللعبة، ' + moveColor + ' خسر (كش ملك).';
+                status = i18n[currentLang].win + " " + moveColor;
             } else if (game.in_draw()) {
-                status = 'تعادل!';
+                status = i18n[currentLang].draw;
             } else {
-                status = 'دور ' + moveColor;
+                status = (currentLang === 'ar' ? "الدور على: " : "Turn: ") + moveColor;
+                if (game.in_check()) status += " (Check!)";
             }
+
             $status.html(status);
+        }
+
+        function toggleAI() {
+            aiEnabled = !aiEnabled;
+            document.getElementById('aiBtn').innerText = aiEnabled ? i18n[currentLang].aiOn : i18n[currentLang].aiOff;
+        }
+
+        function changeLang() {
+            currentLang = (currentLang === 'ar') ? 'en' : 'ar';
+            document.getElementById('title').innerText = i18n[currentLang].title;
+            document.getElementById('resetBtn').innerText = i18n[currentLang].reset;
+            toggleAI(); toggleAI(); // تحديث نص الزر
+            updateStatus();
+        }
+
+        function newGame() {
+            game.reset();
+            board.start();
+            updateStatus();
         }
 
         var config = {
@@ -70,19 +191,12 @@
             position: 'start',
             onDragStart: onDragStart,
             onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         };
         board = Chessboard('board', config);
+        updateStatus();
 
-        function setLanguage(lang) {
-            if(lang === 'ar') {
-                document.getElementById('title').innerText = "شطرنج المحترفين";
-                document.dir = "rtl";
-            } else {
-                document.getElementById('title').innerText = "Pro Chess";
-                document.dir = "ltr";
-            }
-        }
     </script>
 </body>
 </html>
