@@ -1,125 +1,88 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zoge Chess</title>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-<script src="https://unpkg.com/stockfish@16/stockfish.js"></script>
-
-<style>
-body { background:#121212; color:#fff; font-family:Arial; text-align:center }
-#board { width:90vw; max-width:480px; margin:20px auto }
-button { padding:15px 30px; font-size:18px; margin:10px; cursor:pointer }
-#status { font-size:20px; margin:15px }
-#loading { color:#ff0; display:none }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شطرنج المحترفين</title>
+    <!-- مكتبات اللوحة والمنطق -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #2c3e50; color: white; }
+        #board { width: 400px; margin: 20px auto; }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; }
+    </style>
 </head>
-
 <body>
 
-<h2>♟️ شطرنج ضد AI مستحيل</h2>
-<div id="loading">الذكاء الاصطناعي يفكر...</div>
-<div id="board"></div>
-<div id="status">اضغط للبدء</div>
+    <h1 id="title">شطرنج المحترفين</h1>
+    <div id="board"></div>
+    
+    <div class="controls">
+        <button onclick="setLanguage('ar')">العربية</button>
+        <button onclick="setLanguage('en')">English</button>
+        <p id="status">الحالة: دور الأبيض</p>
+    </div>
 
-<button onclick="startGame('w')">العب أبيض</button>
-<button onclick="startGame('b')">العب أسود</button>
+    <script>
+        var board = null;
+        var game = new Chess();
+        var $status = $('#status');
 
-<script>
-let game = new Chess()
-let board = null
-let engine = null
-let playerColor = 'w'
-let engineReady = false
+        function onDragStart (source, piece, position, orientation) {
+            if (game.game_over()) return false;
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                return false;
+            }
+        }
 
-// تشغيل Stockfish
-function initEngine() {
-  engine = new Worker("https://unpkg.com/stockfish@16/stockfish.js")
+        function onDrop (source, target) {
+            var move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q' 
+            });
 
-  engine.onmessage = (e) => {
-    const line = e.data
-    if (line === 'uciok') engineReady = true
+            if (move === null) return 'snapback';
+            updateStatus();
+        }
 
-    if (line.startsWith('bestmove')) {
-      const move = line.split(' ')[1]
-      game.move(move)
-      board.position(game.fen())
-      document.getElementById('loading').style.display = 'none'
-      document.getElementById('status').textContent = 'دورك'
-      if (game.game_over()) endGame()
-    }
-  }
+        function updateStatus () {
+            var status = '';
+            var moveColor = (game.turn() === 'w') ? 'الأبيض' : 'الأسود';
 
-  engine.postMessage('uci')
-  engine.postMessage('setoption name Skill Level value 20')
-  engine.postMessage('setoption name Hash value 256')
-  engine.postMessage('setoption name Threads value 4')
-  engine.postMessage('setoption name Contempt value 100')
-}
+            if (game.in_checkmate()) {
+                status = 'انتهت اللعبة، ' + moveColor + ' خسر (كش ملك).';
+            } else if (game.in_draw()) {
+                status = 'تعادل!';
+            } else {
+                status = 'دور ' + moveColor;
+            }
+            $status.html(status);
+        }
 
-function initBoard() {
-  if (board) board.destroy()
+        var config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+        };
+        board = Chessboard('board', config);
 
-  board = Chessboard('board', {
-    draggable: true,
-    position: game.fen(),
-    orientation: playerColor === 'w' ? 'white' : 'black',
-
-    onDragStart: (source) => {
-      if (game.game_over()) return false
-      if (game.turn() !== playerColor) return false
-      if (game.turn() === 'w' && source[0] !== 'w') return false
-      if (game.turn() === 'b' && source[0] !== 'b') return false
-    },
-
-    onDrop: (source, target) => {
-      const move = game.move({ from: source, to: target, promotion: 'q' })
-      if (!move) return 'snapback'
-
-      if (game.game_over()) return endGame()
-
-      document.getElementById('loading').style.display = 'block'
-      document.getElementById('status').textContent = 'الذكاء الاصطناعي يفكر...'
-
-      engine.postMessage('position fen ' + game.fen())
-      engine.postMessage('go depth 40')
-    }
-  })
-}
-
-function startGame(color) {
-  if (!engineReady) {
-    alert('الـ AI لم يجهز بعد، انتظر ثانيتين')
-    return
-  }
-
-  playerColor = color
-  game.reset()
-  initBoard()
-  document.getElementById('status').textContent = 'بدأت اللعبة'
-
-  if (playerColor === 'b') {
-    document.getElementById('loading').style.display = 'block'
-    engine.postMessage('position startpos')
-    engine.postMessage('go depth 40')
-  }
-}
-
-function endGame() {
-  if (game.in_checkmate()) {
-    document.getElementById('status').textContent =
-      game.turn() === playerColor ? 'خسرت 😈' : 'فزت؟ مستحيل 😳'
-  } else {
-    document.getElementById('status').textContent = 'تعادل'
-  }
-}
-
-initEngine()
-</script>
-
+        function setLanguage(lang) {
+            if(lang === 'ar') {
+                document.getElementById('title').innerText = "شطرنج المحترفين";
+                document.dir = "rtl";
+            } else {
+                document.getElementById('title').innerText = "Pro Chess";
+                document.dir = "ltr";
+            }
+        }
+    </script>
 </body>
 </html>
