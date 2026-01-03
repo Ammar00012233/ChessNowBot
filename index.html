@@ -3,297 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>منصة الألعاب الملكية V8</title>
+    <title>إمبراطورية الألعاب الملكية V12.1</title>
+    
+    <!-- المكتبات -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
     <style>
-        :root { --gold: #d4af37; --bg: #0d0d0d; --panel: #1a1a1a; --white: #fff; --green: #1b5e20; }
+        :root { --gold: #d4af37; --bg: #050505; --panel: #121212; --white: #fff; }
         body { margin: 0; background: var(--bg); color: var(--white); font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: manipulation; }
-        
-        /* شاشات التنقل */
+
+        /* شاشة التحميل */
+        #splash { position: fixed; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .loader { width: 50px; height: 50px; border: 3px solid transparent; border-top: 3px solid var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* الهيدر المنظم */
+        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #111; border-bottom: 2px solid var(--gold); box-sizing: border-box; }
+        .btn-header { background: #222; color: var(--gold); border: 1px solid var(--gold); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 1.1rem; }
+
+        /* الصفحات */
         .page { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; position: absolute; }
         .active { display: flex; animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* الهيدر */
-        .game-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #111; border-bottom: 2px solid var(--gold); z-index: 1001; }
-        .header-btns { display: flex; gap: 8px; }
-        .nav-btn { background: #333; color: white; border: 1px solid var(--gold); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; }
+        .menu-card { background: var(--panel); width: 90%; max-width: 400px; border-radius: 20px; margin: 12px; padding: 20px; display: flex; align-items: center; gap: 20px; border-right: 6px solid var(--gold); cursor: pointer; transition: 0.2s; }
+        .menu-card:active { transform: scale(0.97); }
 
-        /* اللوبي (القائمة) */
-        .lobby-title { margin-top: 30px; color: var(--gold); font-size: 2.2rem; text-shadow: 0 0 10px var(--gold); }
-        .game-card { background: var(--panel); width: 90%; max-width: 380px; border-radius: 15px; margin: 10px; padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; cursor: pointer; }
-
-        /* الشطرنج */
-        #chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 380px; border: 4px solid #333; margin-top: 10px; }
+        /* اللوحة */
+        #chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 400px; border: 4px solid #333; margin-top: 15px; }
         .sq { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; }
-        .l { background: #f0d9b5; } .d { background: #b58863; }
-        .sq img { width: 90%; }
+        .l { background: #eae9d2; } .d { background: #4b7399; }
+        .sq img { width: 90%; pointer-events: none; }
         .hint::after { content: ""; width: 30%; height: 30%; background: rgba(0, 255, 0, 0.4); border-radius: 50%; position: absolute; }
-        .sel { background: rgba(255, 255, 0, 0.5) !important; }
+        .sel { background: rgba(255, 255, 0, 0.4) !important; }
 
-        /* البصرة - طاولة كبيرة ورؤية واضحة */
-        .score-box { background: rgba(212, 175, 55, 0.1); width: 100%; padding: 10px 0; display: flex; justify-content: space-around; border-bottom: 1px solid #333; font-weight: bold; }
-        .table { background: radial-gradient(circle, #2e7d32 0%, #113813 100%); width: 95%; flex-grow: 1; max-height: 280px; border-radius: 20px; border: 4px solid #0a290c; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; padding: 15px; margin: 10px 0; overflow-y: auto; box-shadow: inset 0 0 50px rgba(0,0,0,0.5); }
-        .card-ui { width: 60px; height: 90px; background: #fff; border-radius: 8px; color: #000; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #000; font-size: 18px; box-shadow: 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; }
-        .card-hidden { background: #b71c1c; border-color: #fff; color: transparent; pointer-events: none; }
-        .red { color: #d32f2f; }
-        
-        /* البروفايل */
-        .profile-card { background: var(--panel); width: 85%; padding: 25px; border-radius: 20px; border: 2px solid var(--gold); text-align: center; margin-top: 20px; }
-        .stat-line { font-size: 1.2rem; margin: 15px 0; display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        /* البصرة */
+        .table-area { background: radial-gradient(circle, #237a2b 0%, #0a290c 100%); width: 95%; flex-grow: 1; max-height: 250px; border-radius: 25px; border: 4px solid #111; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; padding: 15px; margin: 10px 0; overflow-y: auto; }
+        .card-pro { width: 55px; height: 85px; background: #fff; border-radius: 8px; color: #000; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #000; font-size: 16px; box-shadow: 3px 3px 6px rgba(0,0,0,0.5); cursor: pointer; }
+        .back-c { background: #b71c1c; border-color: #fff; color: transparent; }
 
-        /* النوافذ المنبثقة (القوانين) */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 5000; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: right; }
-        .modal-content { background: #222; padding: 20px; border-radius: 15px; border: 1px solid var(--gold); max-width: 90%; line-height: 1.6; }
-
-        button { background: var(--gold); border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; color: black; }
-        #msg { position: fixed; top: 40%; background: var(--gold); color: black; padding: 10px 30px; border-radius: 20px; font-weight: bold; display: none; z-index: 6000; }
+        .btn-gold { background: var(--gold); border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 45%; }
+        #toast { position: fixed; top: 15%; background: var(--gold); color: #000; padding: 10px 30px; border-radius: 20px; font-weight: bold; display: none; z-index: 9999; }
     </style>
 </head>
 <body>
 
-    <!-- الصوتيات -->
-    <audio id="bg-music" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"></audio>
-    <audio id="snd-move" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
-    <audio id="snd-card" src="https://www.soundjay.com/misc/sounds/card-flip-1.mp3"></audio>
+    <audio id="mus-bg" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"></audio>
+    <audio id="s-move" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
+    <audio id="s-card" src="https://www.soundjay.com/misc/sounds/card-flip-1.mp3"></audio>
 
-    <div id="msg">بصرة! 🔥</div>
+    <div id="splash"><div class="loader"></div><h2 style="color:var(--gold); margin-top:15px;">ROYAL GAMES</h2></div>
+    <div id="toast"></div>
 
-    <!-- نافذة القوانين -->
-    <div id="rules-modal" class="modal" onclick="this.style.display='none'">
-        <div class="modal-content">
-            <h2 style="color:var(--gold); text-align:center;">قوانين اللعبة</h2>
-            <div id="rules-text"></div>
-            <p style="text-align:center; color:var(--gold); margin-top:10px;">اضغط في أي مكان للإغلاق</p>
-        </div>
-    </div>
-
-    <!-- القائمة الرئيسية -->
-    <div id="page-lobby" class="page active">
-        <h1 class="lobby-title">القصر الملكي</h1>
-        <div class="game-card" onclick="openPage('chess')"><span>♟️</span><div><b>شطرنج الملوك</b><p>الذكاء الاصطناعي الأقوى</p></div></div>
-        <div class="game-card" onclick="openPage('basra')"><span>🃏</span><div><b>بصرة 200 نقطة</b><p>تحدي الكوتشينة المصري</p></div></div>
-        <div class="game-card" onclick="openPage('profile')"><span>👤</span><div><b>البروفايل الشخصي</b><p>إنجازاتك ونقاطك</p></div></div>
-        <button onclick="toggleMusic()" id="lobby-music-btn" style="margin-top:20px; width:200px;">🎶 تشغيل الموسيقى</button>
+    <!-- المنيو -->
+    <div id="p-lobby" class="page active">
+        <h1 style="color:var(--gold); margin-top:50px;">القصر الإمبراطوري</h1>
+        <div class="menu-card" onclick="nav('chess')"><span>♟️</span><div><b>شطرنج الملوك</b><p>صعوبة Master | أونلاين</p></div></div>
+        <div class="menu-card" onclick="nav('basra')"><span>🃏</span><div><b>بصرة 200 نقطة</b><p>تحدي ذكي | أونلاين</p></div></div>
+        <div class="menu-card" onclick="nav('profile')"><span>👤</span><div><b>الملف الشخصي</b><p>نقاطك وإحصائياتك</p></div></div>
+        <button class="btn-header" onclick="toggleM()" style="width:200px; margin-top:20px;">🎵 موسيقى</button>
     </div>
 
     <!-- صفحة الشطرنج -->
-    <div id="page-chess" class="page">
-        <div class="game-header">
-            <button class="nav-btn" onclick="openPage('lobby')">🏠</button>
-            <div class="header-btns">
-                <button class="nav-btn" onclick="showRules('chess')">❓</button>
-                <button class="nav-btn" onclick="toggleMusic()" id="c-music-btn">🎶</button>
-                <button class="nav-btn" onclick="initChess(chessMode)">🔄</button>
-            </div>
+    <div id="p-chess" class="page">
+        <div class="header">
+            <button class="btn-header" onclick="nav('lobby')">🏠</button>
+            <div id="c-status" style="color:var(--gold); font-weight:bold;">شطرنج الملك</div>
+            <button class="btn-header" onclick="initChess()">🔄</button>
         </div>
-        <div id="chess-status" style="margin:10px; color:var(--gold); font-weight:bold;">دور: الأبيض</div>
         <div id="chess-board"></div>
-        <div style="display:flex; gap:10px;">
-            <button onclick="initChess('ai')">🤖 ضد المحترف</button>
-            <button onclick="initChess('friend')">👥 ضد صديق</button>
+        <div style="display:flex; width:90%; gap:10px; margin-top:15px;">
+            <button class="btn-gold" onclick="cMode='ai'; initChess()">🤖 كمبيوتر</button>
+            <button class="btn-gold" onclick="startOnline('chess')">🌐 أونلاين</button>
         </div>
+        <input type="text" id="c-room" style="margin-top:10px; padding:10px; border-radius:10px; text-align:center;" placeholder="رقم الغرفة">
     </div>
 
     <!-- صفحة البصرة -->
-    <div id="page-basra" class="page">
-        <div class="game-header">
-            <button class="nav-btn" onclick="openPage('lobby')">🏠</button>
-            <div class="header-btns">
-                <button class="nav-btn" onclick="showRules('basra')">❓</button>
-                <button class="nav-btn" onclick="toggleMusic()" id="b-music-btn">🎶</button>
-                <button class="nav-btn" onclick="initBasra(bMode)">🔄</button>
-            </div>
+    <div id="p-basra" class="page">
+        <div class="header">
+            <button class="btn-header" onclick="nav('lobby')">🏠</button>
+            <div style="color:var(--gold); font-weight:bold;">بصرة 200</div>
+            <button class="btn-header" onclick="initBasra()">🔄</button>
         </div>
-        <div class="score-box">
-            <span>أنت: <b id="sc1" style="color:var(--gold)">0</b></span>
-            <span style="color:#aaa">الهدف: 200</span>
-            <span>خصمك: <b id="sc2" style="color:var(--gold)">0</b></span>
+        <div style="width:100%; display:flex; justify-content:space-around; padding:8px 0; background:#111;">
+            <span>أنت: <b id="sc1">0</b></span> <span>الخصم: <b id="sc2">0</b></span>
         </div>
-        <div id="b-p2-hand" style="display:flex; gap:5px; height:90px; margin-top:5px;"></div>
-        <div id="b-table" class="table"></div>
-        <div id="b-p1-hand" style="display:flex; gap:8px; height:95px; margin-bottom:10px;"></div>
-        <div id="b-init">
-            <button onclick="initBasra('ai')">🤖 ضد الكمبيوتر</button>
-            <button onclick="initBasra('friend')">👥 ضد صديق</button>
+        <div id="b-p2" style="display:flex; gap:5px; height:85px; margin-top:10px;"></div>
+        <div id="b-table" class="table-area"></div>
+        <div id="b-p1" style="display:flex; gap:5px; height:85px; margin-bottom:15px;"></div>
+        <div style="display:flex; width:90%; gap:10px;">
+            <button class="btn-gold" onclick="bMode='ai'; initBasra()">🤖 كمبيوتر</button>
+            <button class="btn-gold" onclick="startOnline('basra')">🌐 أونلاين</button>
         </div>
+        <input type="text" id="b-room" style="margin-top:10px; padding:10px; border-radius:10px; text-align:center;" placeholder="رقم الغرفة">
     </div>
 
     <!-- صفحة البروفايل -->
-    <div id="page-profile" class="page">
-        <div class="game-header">
-            <button class="nav-btn" onclick="openPage('lobby')">🏠</button>
-            <div class="game-title">الملف الشخصي</div>
-        </div>
-        <div class="profile-card">
-            <h2 style="color:var(--gold); margin-bottom:20px;">👤 إحصائياتي</h2>
-            <div class="stat-line"><span>فوز شطرنج:</span> <b id="stat-chess">0</b></div>
-            <div class="stat-line"><span>فوز بصرة:</span> <b id="stat-basra">0</b></div>
-            <div class="stat-line"><span>إجمالي النقاط:</span> <b id="stat-pts">0</b></div>
-            <button onclick="localStorage.clear(); location.reload();" style="background:#e74c3c; margin-top:20px;">تصفير البيانات</button>
+    <div id="p-profile" class="page">
+        <div class="header"><button class="btn-header" onclick="nav('lobby')">🏠</button><div>البروفايل</div></div>
+        <div style="background:var(--panel); width:85%; padding:25px; border-radius:20px; border:1px solid var(--gold); margin-top:50px; text-align:center;">
+            <h2 id="p-name" style="color:var(--gold)">لاعب ملكي</h2>
+            <p>فوز شطرنج: <span id="st-c">0</span></p>
+            <p>فوز بصرة: <span id="st-b">0</span></p>
+            <p>إجمالي النقاط: <span id="st-p">0</span></p>
+            <button onclick="localStorage.clear(); location.reload();" style="background:red; color:white; padding:10px; border-radius:10px; border:none; margin-top:20px;">تصفير</button>
         </div>
     </div>
 
     <script>
-        // --- 1. الأساسيات ---
-        function openPage(id) {
+        // --- Firebase ---
+        const firebaseConfig = { apiKey: "AIzaSyDmhy8ToQ3LmvifZT7Foz9GfoPXLNlrYLs", projectId: "royal-games-imp" }; // ضع بياناتك هنا
+        firebase.initializeApp(firebaseConfig);
+        const rtdb = firebase.database();
+        const store = firebase.firestore();
+        let myId = localStorage.getItem('r_uid') || "u_" + Math.random().toString(36).substr(2, 5);
+        localStorage.setItem('r_uid', myId);
+
+        // --- نظام الملاحة ---
+        window.onload = () => setTimeout(() => document.getElementById('splash').style.display='none', 1500);
+        function nav(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-' + id).classList.add('active');
-            if(id === 'profile') loadStats();
+            document.getElementById('p-' + id).classList.add('active');
+            if(id === 'profile') syncProfile();
         }
-        function snd(id) { let a = document.getElementById(id); a.currentTime=0; a.play().catch(()=>{}); }
-        function showMsg(m) { const el = document.getElementById('msg'); el.innerText = m; el.style.display='block'; setTimeout(()=>el.style.display='none', 1500); }
+        function msg(t) { const el = document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',1500); }
+        function playS(id) { let a=document.getElementById(id); a.currentTime=0; a.play().catch(()=>{}); }
+        let isM=false; function toggleM() { let m=document.getElementById('mus-bg'); isM?m.pause():m.play(); isM=!isM; }
 
-        function showRules(game) {
-            const modal = document.getElementById('rules-modal');
-            const text = document.getElementById('rules-text');
-            if(game === 'chess') {
-                text.innerHTML = "• الأبيض يبدأ أولاً.<br>• كش ملك يعني نهاية اللعبة.<br>• التبييت والأكل بالتجاوز مدعومان.<br>• الكمبيوتر مبرمج على مستوى محترف.";
-            } else {
-                text.innerHTML = "• الهدف: الوصول لـ 200 نقطة.<br>• الولد (J) والـ 7 الكومي (♦) يجمعان كل الكروت.<br>• البصرة: مسح الطاولة بكارت مماثل = 10 نقاط.<br>• أي كارتين متماثلين = نقطتين.";
-            }
-            modal.style.display = 'flex';
-        }
-
-        let musicPlaying = false;
-        function toggleMusic() {
-            const m = document.getElementById('bg-music');
-            musicPlaying = !musicPlaying;
-            musicPlaying ? m.play() : m.pause();
-            const icon = musicPlaying ? "🔇" : "🎶";
-            document.getElementById('c-music-btn').innerText = icon;
-            document.getElementById('b-music-btn').innerText = icon;
-            document.getElementById('lobby-music-btn').innerText = musicPlaying ? "🔇 كتم الموسيقى" : "🎶 تشغيل الموسيقى";
-        }
-
-        // --- 2. البروفايل ---
-        function loadStats() {
-            let s = JSON.parse(localStorage.getItem('royal_v8_stats')) || {cw: 0, bw: 0, pts: 0};
-            document.getElementById('stat-chess').innerText = s.cw;
-            document.getElementById('stat-basra').innerText = s.bw;
-            document.getElementById('stat-pts').innerText = s.pts;
-        }
-        function saveWin(type, pts) {
-            let s = JSON.parse(localStorage.getItem('royal_v8_stats')) || {cw: 0, bw: 0, pts: 0};
-            if(type === 'chess') s.cw++; else s.bw++;
-            s.pts += pts;
-            localStorage.setItem('royal_v8_stats', JSON.stringify(s));
-        }
-
-        // --- 3. محرك الشطرنج ---
-        let chess = new Chess(), chessMode = 'ai', selSq = null;
-        function initChess(m) {
-            chessMode = m; chess.reset(); const b = document.getElementById('chess-board'); b.innerHTML = '';
-            for (let i=0; i<64; i++) {
-                const r=Math.floor(i/8), c=i%8, name=String.fromCharCode(97+c)+(8-r);
-                const sq = document.createElement('div'); sq.className = `sq ${(r+c)%2===0?'l':'d'}`;
-                sq.dataset.name = name; sq.onclick = () => handleChess(name); b.appendChild(sq);
+        // --- محرك الشطرنج (إصلاح الإعادة) ---
+        let chess = new Chess(), cMode='ai', cRoom='', selSq=null;
+        function initChess() {
+            chess.reset(); // تصفير عقل اللعبة
+            selSq = null;  // تصفير الاختيار
+            const b = document.getElementById('chess-board'); b.innerHTML='';
+            for(let i=0; i<64; i++) {
+                const r=Math.floor(i/8), c=i%8, n=String.fromCharCode(97+c)+(8-r);
+                const s=document.createElement('div'); s.className=`sq ${(r+c)%2===0?'l':'d'}`;
+                s.dataset.n=n; s.onclick=()=>handleChess(n); b.appendChild(s);
             }
             renderChess();
-        }
-        function renderChess() {
-            document.querySelectorAll('.sq').forEach(el => {
-                el.innerHTML = ''; el.classList.remove('hint', 'sel');
-                const p = chess.get(el.dataset.name);
-                if (p) {
-                    const img = document.createElement('img');
-                    img.src = `https://chessboardjs.com/img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png`;
-                    el.appendChild(img);
-                }
-            });
-            document.getElementById('chess-status').innerText = chess.turn()==='w'?"دور: الأبيض":"دور: الأسود";
-            if(chess.game_over()) {
-                alert("انتهى الجيم!");
-                if(chess.in_checkmate() && chess.turn() === 'b') saveWin('chess', 100);
-                openPage('lobby');
-            }
-        }
-        function handleChess(sq) {
-            if (document.querySelector(`[data-name="${sq}"]`).classList.contains('hint')) {
-                chess.move({ from: selSq, to: sq, promotion: 'q' }); snd('snd-move'); renderChess();
-                if (!chess.game_over() && chessMode === 'ai') setTimeout(makeChessAI, 600);
-                return;
-            }
-            const p = chess.get(sq);
-            if (p && p.color === chess.turn()) {
-                selSq = sq; renderChess();
-                document.querySelector(`[data-name="${sq}"]`).classList.add('sel');
-                chess.moves({ square: sq, verbose: true }).forEach(m => document.querySelector(`[data-name="${m.to}"]`).classList.add('hint'));
-            }
-        }
-        function makeChessAI() {
-            const moves = chess.moves({ verbose: true });
-            if (moves.length === 0) return;
-            moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
-            chess.move(moves[0]); snd('snd-move'); renderChess();
+            document.getElementById('c-status').innerText = "شطرنج الملك";
+            msg("تم بدء جيم جديد");
         }
 
-        // --- 4. محرك البصرة V8 ---
-        let bDeck=[], bTable=[], bP1=[], bP2=[], bSc1=0, bSc2=0, bTurn=1, bMode='ai';
-        function initBasra(m) {
-            bMode = m; bSc1 = 0; bSc2 = 0; bTurn = 1;
-            document.getElementById('b-init').style.display = 'none';
-            newRound();
-        }
-        function newRound() {
-            bDeck = [];
-            ['♠','♣','♥','♦'].forEach(s => ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(r => bDeck.push({r, s, c: (s==='♥'||s==='♦')?'red':'black'})));
-            bDeck.sort(() => Math.random() - 0.5);
-            bTable = bDeck.splice(0, 4);
-            dealCards();
-        }
-        function dealCards() {
-            if (bDeck.length > 0) { bP1 = bDeck.splice(0, 4); bP2 = bDeck.splice(0, 4); renderBasra(); }
-            else if (bP1.length === 0 && bP2.length === 0) setTimeout(newRound, 1000);
-        }
-        function renderBasra() {
-            const tA=document.getElementById('b-table'), p1A=document.getElementById('b-p1-hand'), p2A=document.getElementById('b-p2-hand');
-            tA.innerHTML=''; p1A.innerHTML=''; p2A.innerHTML='';
-            bTable.forEach(c => tA.appendChild(createBCard(c, false)));
-            bP1.forEach((c, i) => { const el=createBCard(c, false); if(bTurn === 1) el.addEventListener('click', () => playBCard(i, 1)); p1A.appendChild(el); });
-            bP2.forEach((c, i) => { 
-                const hid = (bMode==='ai' || bTurn===1);
-                const el = createBCard(c, hid);
-                if(bTurn === 2 && bMode === 'friend') el.addEventListener('click', () => playBCard(i, 2));
-                p2A.appendChild(el); 
+        function renderChess() {
+            document.querySelectorAll('.sq').forEach(s => {
+                s.innerHTML=''; s.classList.remove('hint','sel');
+                const p = chess.get(s.dataset.n);
+                if(p) { let img=document.createElement('img'); img.src=`https://chessboardjs.com/img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png`; s.appendChild(img); }
             });
-            document.getElementById('sc1').innerText = bSc1;
-            document.getElementById('sc2').innerText = bSc2;
-            if (bSc1 >= 200 || bSc2 >= 200) {
-                alert(bSc1 >= 200 ? "أنت الفائز الملكي! 🏆" : "الكمبيوتر فاز!");
-                if(bSc1 >= 200) saveWin('basra', bSc1);
-                location.reload();
+        }
+
+        function handleChess(sq) {
+            if(document.querySelector(`[data-n="${sq}"]`).classList.contains('hint')) {
+                const mv = { from: selSq, to: sq, promotion: 'q' };
+                chess.move(mv); playS('s-move'); renderChess();
+                if(cMode==='online') rtdb.ref(`rooms/chess/${cRoom}`).set({m: mv, p: myId, t: Date.now()});
+                if(!chess.game_over() && cMode==='ai') setTimeout(masterAI, 600);
+                checkEnd('chess'); return;
+            }
+            const p = chess.get(sq);
+            if(p && p.color===chess.turn()) {
+                selSq=sq; renderChess(); document.querySelector(`[data-n="${sq}"]`).classList.add('sel');
+                chess.moves({square:sq, verbose:true}).forEach(m => document.querySelector(`[data-n="${m.to}"]`).classList.add('hint'));
             }
         }
-        function createBCard(card, hid) {
-            const div = document.createElement('div');
-            div.className = 'card-ui' + (hid?' card-hidden':'') + (card.c==='red'?' red':'');
-            div.innerHTML = hid ? '' : `<span>${card.r}</span><span style="font-size:20px">${card.s}</span>`;
-            return div;
+
+        function masterAI() {
+            const moves = chess.moves({verbose:true});
+            if(moves.length===0) return;
+            const vals = {p:10, n:32, b:33, r:50, q:90, k:900};
+            moves.sort((a,b) => ((b.captured ? vals[b.captured] : 0) + (b.san.includes('+')?10:0)) - ((a.captured ? vals[a.captured] : 0) + (a.san.includes('+')?10:0)));
+            chess.move(moves[0]); playS('s-move'); renderChess(); checkEnd('chess');
         }
-        function playBCard(idx, p) {
-            snd('snd-card');
-            const hand = (p === 1) ? bP1 : bP2;
-            if(!hand[idx]) return;
-            const card = hand.splice(idx, 1)[0];
-            let captured = 0;
-            let matchIdx = bTable.findIndex(c => c.r === card.r);
-            if (card.r === 'J' || (card.r === '7' && card.s === '♦')) {
-                if (bTable.length > 0) { captured = bTable.length + 1; bTable = []; showMsg("بصرة قوية! 🔥"); if(captured === 1) captured = 10; } else { bTable.push(card); }
-            } else if (matchIdx !== -1) {
-                captured = 2; bTable.splice(matchIdx, 1); if (bTable.length === 0) { captured += 10; showMsg("بصرة! 💥"); }
-            } else { bTable.push(card); }
-            if(p === 1) bSc1 += captured; else bSc2 += captured;
-            bTurn = (p === 1) ? 2 : 1;
-            renderBasra();
-            if (bP1.length === 0 && bP2.length === 0) setTimeout(dealCards, 800);
-            if (bMode === 'ai' && bTurn === 2) setTimeout(makeBasraAI, 1000);
+
+        // --- محرك البصرة (Smart Logic) ---
+        let bDeck=[], bTable=[], bP1=[], bP2=[], bS1=0, bS2=0, bTurn=1, bMode='ai';
+        function initBasra() {
+            bS1=0; bS2=0; bTurn=1; 
+            newB();
+            msg("بدء تحدي البصرة");
         }
-        function makeBasraAI() {
-            if (bP2.length === 0) return;
-            let bestIdx = 0;
-            for (let i=0; i<bP2.length; i++) { if (bTable.some(c => c.r === bP2[i].r) || bP2[i].r === 'J') { bestIdx = i; break; } }
-            playBCard(bestIdx, 2);
+        function newB() {
+            bDeck=[]; ['♠','♣','♥','♦'].forEach(s => ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(r => bDeck.push({r,s,c:(s==='♥'||s==='♦')?'red':'black'})));
+            bDeck.sort(()=>Math.random()-0.5);
+            bTable = bDeck.splice(0,4); dealB();
+        }
+        function dealB() {
+            if(bDeck.length>0) { bP1=bDeck.splice(0,4); bP2=bDeck.splice(0,4); renderB(); }
+            else if(bP1.length===0 && bP2.length===0) newB();
+        }
+        function renderB() {
+            const tA=document.getElementById('b-table'), p1A=document.getElementById('b-p1'), p2A=document.getElementById('b-p2');
+            tA.innerHTML=''; p1A.innerHTML=''; p2A.innerHTML='';
+            bTable.forEach(c => tA.appendChild(createC(c, false)));
+            bP1.forEach((c,i) => { let el=createC(c,false); if(bTurn===1) el.onclick=()=>playB(i,1); p1A.appendChild(el); });
+            bP2.forEach((c,i) => { 
+                let hid = (bMode==='ai' || bTurn===1); let el=createC(c,hid); 
+                p2A.appendChild(el); 
+            });
+            document.getElementById('sc1').innerText=bS1; document.getElementById('sc2').innerText=bS2;
+        }
+        function createC(card, hid) {
+            const d=document.createElement('div'); d.className='card-pro'+(hid?' back-c':'')+(card.c==='red'?' red':'');
+            d.innerHTML = hid ? '' : `<span>${card.r}</span><span style="font-size:24px">${card.s}</span>`;
+            return d;
+        }
+        function playB(idx, p) {
+            playS('s-card'); const hand = p===1?bP1:bP2; const card = hand.splice(idx,1)[0];
+            let gain = 0; let mIdx = bTable.findIndex(c => c.r===card.r);
+            if(card.r==='J' || (card.r==='7' && card.s==='♦')) {
+                if(bTable.length>0) { gain=bTable.length+1; bTable=[]; msg("بصرة! 🔥"); } else bTable.push(card);
+            } else if(mIdx!==-1) {
+                gain=2; bTable.splice(mIdx,1); if(bTable.length===0) { gain+=10; msg("بصرة! 💥"); }
+            } else bTable.push(card);
+            if(p===1) bS1+=gain; else bS2+=gain; bTurn = p===1?2:1; renderB();
+            if(bP1.length===0 && bP2.length===0) dealB();
+            if(bMode==='ai' && bTurn===2) setTimeout(bAI, 1000);
+            checkEnd('basra');
+        }
+        function bAI() {
+            let idx = 0;
+            for(let i=0; i<bP2.length; i++) { if(bTable.some(c=>c.r===bP2[i].r) || bP2[i].r==='J') { idx=i; break; } }
+            playB(idx, 2);
+        }
+
+        // --- المزامنة ---
+        async function syncProfile() {
+            const doc = await store.collection('users').doc(myId).get();
+            if(doc.exists) {
+                const d = doc.data();
+                document.getElementById('st-c').innerText=d.cw||0;
+                document.getElementById('st-b').innerText=d.bw||0;
+                document.getElementById('st-p').innerText=d.pts||0;
+            }
+        }
+        function checkEnd(g) {
+            if(g==='chess' && chess.game_over()) { alert("انتهى الجيم!"); nav('lobby'); }
+            if(g==='basra' && (bS1>=200 || bS2>=200)) { alert("وصل أحد اللاعبين لـ 200!"); nav('lobby'); }
         }
     </script>
 </body>
