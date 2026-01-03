@@ -3,96 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>منصة الألعاب الملكية - V13 Online</title>
+    <title>إمبراطورية الألعاب الملكية V14</title>
     
-    <!-- Firebase SDK (Version Compat لسهولة التشغيل في ملف واحد) -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
     <style>
-        :root { --gold: #d4af37; --bg: #050505; --panel: #121212; --white: #fff; }
+        :root { --gold: #d4af37; --bg: #0a0a0a; --panel: rgba(26, 26, 26, 0.95); --white: #ffffff; }
         body { margin: 0; background: var(--bg); color: var(--white); font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: manipulation; }
-        
+
+        /* شاشة الدخول */
         #splash { position: fixed; inset: 0; background: #000; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .loader { width: 50px; height: 50px; border: 3px solid transparent; border-top: 3px solid var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .gold-glow { color: var(--gold); font-size: 2.5rem; text-shadow: 0 0 20px var(--gold); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } }
 
-        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #111; border-bottom: 2px solid var(--gold); box-sizing: border-box; }
-        .btn-h { background: #222; color: var(--gold); border: 1px solid var(--gold); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+        /* الهيدر المحترف */
+        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #111; border-bottom: 2px solid var(--gold); box-sizing: border-box; z-index: 1000; }
+        .nav-btn { background: #222; color: var(--gold); border: 1px solid var(--gold); border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .nav-btn:active { background: var(--gold); color: #000; }
 
-        .page { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; position: absolute; }
-        .active { display: flex; animation: fadeIn 0.4s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* الصفحات */
+        .page { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; position: absolute; top: 0; }
+        .active { display: flex; animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        .menu-card { background: var(--panel); width: 90%; max-width: 400px; border-radius: 20px; margin: 12px; padding: 20px; display: flex; align-items: center; gap: 20px; border-right: 6px solid var(--gold); cursor: pointer; }
-        
-        #chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 400px; border: 4px solid #333; margin-top: 15px; }
+        /* اللوبي */
+        .game-card { background: var(--panel); width: 90%; max-width: 400px; border-radius: 20px; margin: 12px; padding: 25px; display: flex; align-items: center; gap: 20px; border: 1px solid #333; cursor: pointer; border-right: 6px solid var(--gold); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .card-icon { font-size: 45px; }
+
+        /* الشطرنج والبصرة */
+        #chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 400px; border: 5px solid #222; margin-top: 10px; }
         .sq { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .l { background: #eae9d2; } .d { background: #4b7399; }
-        .sq img { width: 90%; pointer-events: none; }
-        .hint::after { content: ""; width: 30%; height: 30%; background: rgba(0, 255, 0, 0.4); border-radius: 50%; position: absolute; }
-        .sel { background: rgba(255, 255, 0, 0.4) !important; }
+        .sq img { width: 92%; pointer-events: none; }
+        .hint::after { content: ""; width: 30%; height: 30%; background: rgba(0, 255, 0, 0.5); border-radius: 50%; position: absolute; }
+        .selected { background: rgba(255, 255, 0, 0.4) !important; }
 
-        .table-area { background: radial-gradient(circle, #237a2b 0%, #0a290c 100%); width: 95%; flex-grow: 1; max-height: 250px; border-radius: 25px; border: 4px solid #111; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; padding: 15px; margin: 10px 0; overflow-y: auto; }
-        .card-pro { width: 55px; height: 85px; background: #fff; border-radius: 8px; color: #000; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #000; font-size: 16px; box-shadow: 3px 3px 6px rgba(0,0,0,0.5); cursor: pointer; }
-        
-        .btn-gold { background: var(--gold); border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 45%; }
-        #toast { position: fixed; top: 15%; background: var(--gold); color: #000; padding: 10px 30px; border-radius: 20px; font-weight: bold; display: none; z-index: 9999; }
+        .b-table { background: radial-gradient(circle, #237a2b 0%, #0a290c 100%); width: 95%; flex-grow: 1; min-height: 250px; border-radius: 30px; border: 4px solid #111; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; padding: 20px; margin: 10px 0; overflow-y: auto; box-shadow: inset 0 0 50px rgba(0,0,0,0.8); }
+        .card-ui { width: 60px; height: 90px; background: #fff; border-radius: 10px; color: #000; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2.5px solid #000; font-size: 18px; box-shadow: 4px 4px 10px rgba(0,0,0,0.5); cursor: pointer; transition: 0.2s; }
+        .card-ui:active { transform: translateY(-15px) rotate(5deg); }
+        .card-back { background: #b71c1c; border-color: #fff; color: transparent; }
+
+        /* البروفايل */
+        .profile-box { background: var(--panel); width: 85%; padding: 40px 20px; border-radius: 30px; border: 2px solid var(--gold); text-align: center; margin-top: 50px; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 1.4rem; padding: 15px 0; border-bottom: 1px solid #333; }
+
+        #toast { position: fixed; top: 10%; background: var(--gold); color: #000; padding: 15px 45px; border-radius: 30px; font-weight: bold; display: none; z-index: 10001; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
     <audio id="mus-bg" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"></audio>
-    <audio id="s-move" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
-    <audio id="s-card" src="https://www.soundjay.com/misc/sounds/card-flip-1.mp3"></audio>
+    <audio id="snd-move" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
+    <audio id="snd-card" src="https://www.soundjay.com/misc/sounds/card-flip-1.mp3"></audio>
 
-    <div id="splash"><div class="loader"></div><h2 style="color:var(--gold); margin-top:15px;">ROYAL GAMES</h2></div>
+    <div id="splash"><h1 class="gold-glow">ROYAL GAMES V14</h1><div style="width:40px;height:40px;border:4px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite"></div></div>
     <div id="toast"></div>
 
+    <!-- الصفحة الرئيسية -->
     <div id="p-lobby" class="page active">
-        <h1 style="color:var(--gold); margin-top:50px;">القصر الإمبراطوري</h1>
-        <div class="menu-card" onclick="nav('chess')"><span>♟️</span><div><b>شطرنج الملوك</b><p>أونلاين حقيقي | ذكاء Master</p></div></div>
-        <div class="menu-card" onclick="nav('basra')"><span>🃏</span><div><b>بصرة 200 نقطة</b><p>تحدي الأصدقاء والكمبيوتر</p></div></div>
-        <div class="menu-card" onclick="nav('profile')"><span>👤</span><div><b>الملف الشخصي</b><p>نقاطك محفوظة سحابياً</p></div></div>
-        <button class="btn-h" onclick="toggleM()" style="width:200px; margin-top:20px;">🎵 موسيقى</button>
+        <h1 style="color:var(--gold); margin-top:50px; text-shadow: 0 0 10px var(--gold);">الإمبراطورية الملكية</h1>
+        <div class="game-card" onclick="nav('chess')"><span class="card-icon">♟️</span><div><b>شطرنج الملوك</b><p>محرك Master AI | أونلاين</p></div></div>
+        <div class="game-card" onclick="nav('basra')"><span class="card-icon">🃏</span><div><b>بصرة 200 نقطة</b><p>تحدي الكوتشينة العالمي</p></div></div>
+        <div class="game-card" onclick="nav('profile')"><span class="card-icon">👤</span><div><b>البروفايل السحابي</b><p>إحصائياتك ونقاطك</p></div></div>
+        <button class="nav-btn" onclick="toggleM()" style="width:220px; margin-top:30px;">🎶 تشغيل الموسيقى</button>
     </div>
 
-    <!-- صفحات الألعاب (نفس هيكل V12.1) -->
+    <!-- صفحة الشطرنج -->
     <div id="p-chess" class="page">
         <div class="header">
-            <button class="btn-h" onclick="nav('lobby')">🏠</button>
-            <div id="c-status" style="color:var(--gold); font-weight:bold;">شطرنج أونلاين</div>
-            <button class="btn-h" onclick="initChess()">🔄</button>
+            <button class="nav-btn" onclick="nav('lobby')">🏠</button>
+            <div id="c-status" style="color:var(--gold); font-weight:bold;">شطرنج الملوك</div>
+            <button class="nav-btn" onclick="initChess()">🔄</button>
         </div>
         <div id="chess-board"></div>
-        <div style="display:flex; width:90%; gap:10px; margin-top:10px;">
-            <button class="btn-gold" onclick="cMode='ai'; initChess()">🤖 كمبيوتر</button>
-            <button class="btn-gold" onclick="startOnline('chess')">🌐 أونلاين</button>
+        <div style="display:flex; gap:10px; width:90%; margin-top:15px;">
+            <button class="nav-btn" style="flex:1" onclick="cMode='ai'; initChess()">🤖 الكمبيوتر</button>
+            <button class="nav-btn" style="flex:1" onclick="startOnline('chess')">🌐 أونلاين</button>
         </div>
-        <input type="text" id="c-room" style="margin-top:10px; padding:10px; border-radius:10px; text-align:center; width:80%;" placeholder="رقم الغرفة">
+        <input type="text" id="c-room" style="margin-top:15px; width:80%; padding:12px; border-radius:12px; text-align:center;" placeholder="رقم الغرفة">
     </div>
 
+    <!-- صفحة البصرة -->
     <div id="p-basra" class="page">
-        <div class="header"><button class="btn-h" onclick="nav('lobby')">🏠</button><div>بصرة أونلاين</div><button class="btn-h" onclick="initBasra()">🔄</button></div>
-        <div style="width:100%; display:flex; justify-content:space-around; padding:8px 0; background:#111;"><span>أنت: <b id="sc1">0</b></span> <span>الخصم: <b id="sc2">0</b></span></div>
-        <div id="b-p2" style="display:flex; gap:5px; height:80px; margin-top:5px;"></div>
-        <div id="b-table" class="table-area"></div>
-        <div id="b-p1" style="display:flex; gap:5px; height:80px; margin-bottom:10px;"></div>
-        <div style="display:flex; width:90%; gap:10px;"><button class="btn-gold" onclick="bMode='ai'; initBasra()">🤖 كمبيوتر</button><button class="btn-gold" onclick="startOnline('basra')">🌐 أونلاين</button></div>
-        <input type="text" id="b-room" style="margin-top:10px; padding:10px; border-radius:10px; text-align:center; width:80%;" placeholder="رقم الغرفة">
+        <div class="header">
+            <button class="nav-btn" onclick="nav('lobby')">🏠</button>
+            <div style="color:var(--gold); font-weight:bold;">بصرة 200</div>
+            <button class="nav-btn" onclick="initBasra()">🔄</button>
+        </div>
+        <div style="width:100%; display:flex; justify-content:space-around; background:#111; padding:10px 0;">
+            <span>أنت: <b id="sc1" style="color:var(--gold)">0</b></span> <span>الخصم: <b id="sc2" style="color:var(--gold)">0</b></span>
+        </div>
+        <div id="b-p2" style="display:flex; gap:8px; height:90px; margin-top:10px;"></div>
+        <div id="b-table" class="b-table"></div>
+        <div id="b-p1" style="display:flex; gap:10px; height:95px; margin-bottom:20px;"></div>
+        <div style="display:flex; gap:10px; width:90%;">
+            <button class="nav-btn" style="flex:1" onclick="bMode='ai'; initBasra()">🤖 كمبيوتر</button>
+            <button class="nav-btn" style="flex:1" onclick="startOnline('basra')">🌐 أونلاين</button>
+        </div>
+        <input type="text" id="b-room" style="margin-top:10px; width:80%; padding:10px; border-radius:10px; text-align:center;" placeholder="رقم الغرفة">
     </div>
 
+    <!-- صفحة البروفايل -->
     <div id="p-profile" class="page">
-        <div class="header"><button class="btn-h" onclick="nav('lobby')">🏠</button><div>بروفايلك العالمي</div></div>
-        <div id="profile-cont" style="background:var(--panel); width:85%; padding:25px; border-radius:20px; border:1px solid var(--gold); margin-top:50px; text-align:center;">
-            <p>تحميل البيانات من السحاب...</p>
+        <div class="header"><button class="nav-btn" onclick="nav('lobby')">🏠</button><div>بروفايل الملك</div></div>
+        <div class="profile-box">
+            <h2 id="p-uid" style="color:var(--gold); font-size:1rem; opacity:0.5;"></h2>
+            <div class="stat-row"><span>فوز شطرنج:</span> <b id="st-c">0</b></div>
+            <div class="stat-row"><span>فوز بصرة:</span> <b id="st-b">0</b></div>
+            <div class="stat-row" style="color:var(--gold); border:none;"><span>النقاط:</span> <b id="st-p">0</b></div>
+            <button onclick="localStorage.clear(); location.reload();" style="background:red; color:white; border:none; padding:12px 30px; border-radius:15px; margin-top:30px; cursor:pointer;">تصفير البيانات</button>
         </div>
     </div>
 
     <script>
-        // --- 1. ربط Firebase ببياناتك الحقيقية ---
+        // --- 1. تهيئة Firebase ببياناتك ---
         const firebaseConfig = {
             apiKey: "AIzaSyDmhy8ToQ3LmvifZT7Foz9GfoPXLNlrYLs",
             authDomain: "chess-online-7a911.firebaseapp.com",
@@ -100,63 +128,47 @@
             storageBucket: "chess-online-7a911.firebasestorage.app",
             messagingSenderId: "137588717582",
             appId: "1:137588717582:web:63e8b8b1b68efbe5c1645f",
-            databaseURL: "https://chess-online-7a911-default-rtdb.firebaseio.com" // تم استنتاج الرابط
+            databaseURL: "https://chess-online-7a911-default-rtdb.firebaseio.com"
         };
         firebase.initializeApp(firebaseConfig);
         const rtdb = firebase.database();
         const store = firebase.firestore();
 
-        let myId = localStorage.getItem('r_uid') || "player_" + Math.random().toString(36).substr(2, 5);
-        localStorage.setItem('r_uid', myId);
+        let myId = localStorage.getItem('royal_v14_uid') || "king_" + Math.random().toString(36).substr(2, 4);
+        localStorage.setItem('royal_v14_uid', myId);
 
-        // --- 2. محرك النظام ---
+        // --- 2. إدارة النظام ---
         window.onload = () => setTimeout(() => document.getElementById('splash').style.display='none', 1500);
         function nav(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('p-' + id).classList.add('active');
-            if(id === 'profile') syncProfile();
+            if(id === 'profile') syncStats();
         }
-        function msg(t) { const el = document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',1500); }
+        function msg(t) { const el = document.getElementById('toast'); el.innerText=t; el.style.display='block'; setTimeout(()=>el.style.display='none',2000); }
         function playS(id) { let a=document.getElementById(id); a.currentTime=0; a.play().catch(()=>{}); }
         let mus=false; function toggleM() { let m=document.getElementById('mus-bg'); mus?m.pause():m.play(); mus=!mus; }
 
-        // --- 3. الأونلاين والمزامنة ---
-        function startOnline(type) {
-            const room = document.getElementById(type === 'chess' ? 'c-room' : 'b-room').value;
-            if(!room) return alert("ادخل رقم الغرفة!");
-            msg("متصل بالغرفة " + room);
-            
-            if(type === 'chess') {
-                cMode = 'online'; cRoom = room; initChess();
-                rtdb.ref(`rooms/chess/${room}`).on('value', snap => {
-                    const d = snap.val();
-                    if(d && d.p !== myId) { chess.move(d.m); renderChess(); playS('s-move'); }
-                });
-            } else {
-                bMode = 'online'; bRoom = room; initBasra();
-                rtdb.ref(`rooms/basra/${room}`).on('value', snap => {
-                    const d = snap.val();
-                    if(d && d.p !== myId) { syncBasra(d.m); }
-                });
-            }
-        }
-
-        async function syncProfile() {
-            const cont = document.getElementById('profile-cont');
+        // --- 3. البروفايل السحابي (Firestore) ---
+        async function syncStats() {
+            document.getElementById('p-uid').innerText = "ID: " + myId;
             const doc = await store.collection('users').doc(myId).get();
             let d = doc.exists ? doc.data() : {cw:0, bw:0, pts:0};
             if(!doc.exists) await store.collection('users').doc(myId).set(d);
-            
-            cont.innerHTML = `
-                <h2 style="color:var(--gold)">${myId}</h2>
-                <p>فوز شطرنج: ${d.cw}</p>
-                <p>فوز بصرة: ${d.bw}</p>
-                <p style="font-size:1.5rem; color:var(--gold)">النقاط: ${d.pts}</p>
-                <button onclick="localStorage.clear(); location.reload();" style="background:red; color:white; padding:10px; border-radius:10px; border:none; margin-top:20px;">تصفير</button>
-            `;
+            document.getElementById('st-c').innerText = d.cw;
+            document.getElementById('st-b').innerText = d.bw;
+            document.getElementById('st-p').innerText = d.pts;
         }
 
-        // --- 4. الشطرنج (Master AI) ---
+        function updateWin(game, points) {
+            const field = game === 'chess' ? 'cw' : 'bw';
+            store.collection('users').doc(myId).update({
+                [field]: firebase.firestore.FieldValue.increment(1),
+                pts: firebase.firestore.FieldValue.increment(points)
+            });
+            msg("مبروك! تم حفظ الفوز سحابياً ✨");
+        }
+
+        // --- 4. شطرنج المحترفين (Hard AI & Online) ---
         let chess = new Chess(), cMode='ai', cRoom='', selSq=null;
         function initChess() {
             chess.reset(); selSq=null; const b = document.getElementById('chess-board'); b.innerHTML='';
@@ -167,20 +179,23 @@
             }
             renderChess();
         }
+
         function renderChess() {
             document.querySelectorAll('.sq').forEach(s => {
                 s.innerHTML=''; s.classList.remove('hint','sel');
                 const p = chess.get(s.dataset.n);
                 if(p) { let img=document.createElement('img'); img.src=`https://chessboardjs.com/img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png`; s.appendChild(img); }
             });
+            document.getElementById('c-status').innerText = chess.turn()==='w'?"دورك (الأبيض)":"تفكير الخصم...";
         }
+
         function handleChess(sq) {
             if(document.querySelector(`[data-n="${sq}"]`).classList.contains('hint')) {
                 const mv = { from: selSq, to: sq, promotion: 'q' };
-                chess.move(mv); playS('s-move'); renderChess();
+                chess.move(mv); playS('snd-move'); renderChess();
                 if(cMode==='online') rtdb.ref(`rooms/chess/${cRoom}`).set({m: mv, p: myId, t: Date.now()});
-                if(!chess.game_over() && cMode==='ai') setTimeout(masterAI, 600);
-                return;
+                if(!chess.game_over() && cMode==='ai') setTimeout(hardChessAI, 600);
+                checkEnd('chess'); return;
             }
             const p = chess.get(sq);
             if(p && p.color===chess.turn()) {
@@ -188,18 +203,26 @@
                 chess.moves({square:sq, verbose:true}).forEach(m => document.querySelector(`[data-n="${m.to}"]`).classList.add('hint'));
             }
         }
-        function masterAI() {
-            const moves = chess.moves();
-            chess.move(moves[Math.floor(Math.random() * moves.length)]);
-            playS('s-move'); renderChess();
+
+        function hardChessAI() {
+            // ذكاء اصطناعي قوي جداً يعتمد على تقييم المربعات
+            const moves = chess.moves({verbose:true});
+            if(moves.length===0) return;
+            const vals = {p:10, n:30, b:30, r:50, q:90, k:900};
+            moves.sort((a,b) => {
+                let scoreA = (a.captured ? vals[a.captured] : 0) + (a.san.includes('#')?100:0) + (a.san.includes('+')?10:0);
+                let scoreB = (b.captured ? vals[b.captured] : 0) + (b.san.includes('#')?100:0) + (b.san.includes('+')?10:0);
+                return scoreB - scoreA;
+            });
+            chess.move(moves[0]); playS('snd-move'); renderChess(); checkEnd('chess');
         }
 
-        // --- 5. البصرة (Logic) ---
+        // --- 5. بصرة المحترفين (V14) ---
         let bDeck=[], bTable=[], bP1=[], bP2=[], bS1=0, bS2=0, bTurn=1, bMode='ai', bRoom='';
-        function initBasra() { bS1=0; bS2=0; bTurn=1; newB(); }
-        function newB() {
+        function initBasra() { bS1=0; bS2=0; bTurn=1; startNewB(); }
+        function startNewB() {
             bDeck=[]; ['♠','♣','♥','♦'].forEach(s => ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].forEach(r => bDeck.push({r,s,c:(s==='♥'||s==='♦')?'red':'black'})));
-            bDeck.sort(()=>Math.random()-0.5); bTable = bDeck.splice(0,4); dealB();
+            bDeck.sort(()=>Math.random()-0.5); bTable=bDeck.splice(0,4); dealB();
         }
         function dealB() { bP1=bDeck.splice(0,4); bP2=bDeck.splice(0,4); renderB(); }
         function renderB() {
@@ -207,23 +230,55 @@
             tA.innerHTML=''; p1A.innerHTML=''; p2A.innerHTML='';
             bTable.forEach(c => tA.appendChild(createC(c, false)));
             bP1.forEach((c,i) => { let el=createC(c,false); if(bTurn===1) el.onclick=()=>playB(i,1); p1A.appendChild(el); });
-            bP2.forEach((c,i) => { let el=createC(c, (bMode==='ai'||bTurn===1)); p2A.appendChild(el); });
+            bP2.forEach((c,i) => { let el=createC(c, (bMode==='ai'||bTurn===1)); if(bTurn===2&&bMode==='online') el.onclick=()=>playB(i,2); p2A.appendChild(el); });
             document.getElementById('sc1').innerText=bS1; document.getElementById('sc2').innerText=bS2;
         }
         function createC(card, hid) {
-            const d=document.createElement('div'); d.className='card-pro'+(hid?' back-c':'')+(card.c==='red'?' red':'');
+            const d=document.createElement('div'); d.className='card-ui'+(hid?' card-back':'')+(card.c==='red'?' red':'');
             d.innerHTML = hid ? '' : `<span>${card.r}</span><span style="font-size:24px">${card.s}</span>`;
             return d;
         }
         function playB(idx, p) {
-            playS('s-card'); const hand = p===1?bP1:bP2; const card = hand.splice(idx,1)[0];
-            let match = bTable.findIndex(c => c.r===card.r);
-            if(card.r==='J') { bS1 += bTable.length + 1; bTable=[]; msg("بصرة ولد! 🔥"); }
-            else if(match!==-1) { bS1 += 2; bTable.splice(match,1); }
-            else bTable.push(card);
-            bTurn = p===1?2:1; renderB();
-            if(bP1.length===0 && bDeck.length>0) dealB();
-            if(bMode==='ai' && bTurn===2) setTimeout(()=>playB(0,2), 1000);
+            playS('snd-card'); const hand = p===1?bP1:bP2; const card = hand.splice(idx,1)[0];
+            let pts = 0; let mIdx = bTable.findIndex(c => c.r===card.r);
+            if(card.r==='J' || (card.r==='7' && card.s==='♦')) {
+                if(bTable.length>0) { pts=bTable.length+1; bTable=[]; msg("بصرة ملكية! 🔥"); } else bTable.push(card);
+            } else if(mIdx!==-1) {
+                pts=2; bTable.splice(mIdx,1); if(bTable.length===0) { pts+=10; msg("بصرة! 💥"); }
+            } else bTable.push(card);
+            if(p===1) bS1+=pts; else bS2+=pts; bTurn = p===1?2:1; renderB();
+            if(bP1.length===0 && bP2.length===0) { if(bDeck.length>0) dealB(); else startNewB(); }
+            if(bMode==='ai' && bTurn===2) setTimeout(()=> {
+                let bestIdx = 0;
+                for(let i=0; i<bP2.length; i++) { if(bTable.some(c=>c.r===bP2[i].r) || bP2[i].r==='J') { bestIdx=i; break; } }
+                playB(bestIdx, 2);
+            }, 1000);
+            checkEnd('basra');
+        }
+
+        // --- 6. نظام الأونلاين (الغرف) ---
+        function startOnline(type) {
+            const room = document.getElementById(type==='chess'?'c-room':'b-room').value;
+            if(!room) return alert("ادخل رقم الغرفة!");
+            msg("متصل بالغرفة: " + room);
+            if(type==='chess') {
+                cMode='online'; cRoom=room; initChess();
+                rtdb.ref(`rooms/chess/${room}`).on('value', snap => {
+                    const d = snap.val();
+                    if(d && d.p !== myId) { chess.move(d.m); renderChess(); playS('snd-move'); }
+                });
+            }
+        }
+
+        function checkEnd(g) {
+            if(g==='chess' && chess.game_over()) { 
+                if(chess.in_checkmate() && chess.turn()==='b') updateWin('chess', 100);
+                alert("انتهى الجيم!"); nav('lobby'); 
+            }
+            if(g==='basra' && (bS1>=200 || bS2>=200)) { 
+                if(bS1>=200) updateWin('basra', bS1);
+                alert(bS1>=200?"مبروك الفوز الملكي!":"هارد لك"); nav('lobby'); 
+            }
         }
     </script>
 </body>
