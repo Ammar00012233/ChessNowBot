@@ -3,195 +3,224 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>شطرنج المحترفين - نسخة مستقرة</title>
+    <title>شطرنج المحترفين Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
-        :root { --light: #f0d9b5; --dark: #b58863; --highlight: rgba(34, 139, 34, 0.6); }
-        body { font-family: sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 10px; overflow: hidden; touch-action: manipulation; }
-        
-        /* تصميم اللوحة */
-        #board-container { width: 95vw; max-width: 400px; margin: 10px auto; position: relative; }
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); border: 2px solid #333; user-select: none; }
-        .square { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        :root { --light: #f0d9b5; --dark: #b58863; --accent: #27ae60; --bg: #121212; --panel: #1e1e1e; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: white; margin: 0; overflow: hidden; }
+
+        /* الصفحات */
+        .page { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; }
+        .active { display: flex; }
+
+        /* القائمة الرئيسية */
+        .menu-btn { background: var(--panel); border: 2px solid var(--accent); color: white; padding: 20px; margin: 10px; width: 80%; max-width: 300px; border-radius: 15px; font-size: 1.2rem; cursor: pointer; transition: 0.3s; font-weight: bold; }
+        .menu-btn:hover { background: var(--accent); transform: translateY(-3px); }
+
+        /* اللوحة */
+        #board { display: grid; grid-template-columns: repeat(8, 1fr); width: 95vw; max-width: 380px; border: 4px solid #333; }
+        .square { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .square.light { background: var(--light); }
         .square.dark { background: var(--dark); }
         .square img { width: 90%; height: 90%; pointer-events: none; }
-        
-        /* تلميحات الحركة */
-        .hint::after { content: ""; width: 30%; height: 30%; background: var(--highlight); border-radius: 50%; position: absolute; }
+        .hint::after { content: ""; width: 30%; height: 30%; background: rgba(34, 139, 34, 0.6); border-radius: 50%; position: absolute; }
         .selected { background: rgba(255, 255, 0, 0.5) !important; }
 
-        .controls { background: #1e1e1e; padding: 15px; border-radius: 10px; width: 90vw; max-width: 400px; margin: 10px auto; box-sizing: border-box; }
-        .status { margin-bottom: 10px; font-size: 1.2rem; color: #2ecc71; font-weight: bold; }
-        button { background: #27ae60; color: white; border: none; padding: 10px; margin: 5px; border-radius: 5px; width: 45%; font-weight: bold; cursor: pointer; }
+        /* البروفايل */
+        .stats-container { background: var(--panel); padding: 20px; border-radius: 20px; width: 85%; max-width: 350px; }
+        .stat-row { display: flex; justify-content: space-around; margin: 20px 0; }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-val { font-size: 1.8rem; font-weight: bold; color: var(--accent); }
+
+        /* التحكم بالصوت */
+        .audio-ctrl { position: fixed; top: 15px; left: 15px; background: var(--panel); padding: 10px; border-radius: 50%; cursor: pointer; z-index: 1000; border: 1px solid var(--accent); }
+
+        /* أزرار التحكم */
+        .back-btn { position: fixed; top: 15px; right: 15px; background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         
-        /* شاشة نهاية اللعبة */
-        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; }
-        #overlay h1 { color: #ff4444; font-size: 3rem; margin: 0; }
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; flex-direction: column; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
 
-    <!-- أصوات الحركة -->
-    <audio id="moveSound" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
-    <audio id="captureSound" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3"></audio>
+    <!-- موسيقى وأصوات -->
+    <audio id="bgMusic" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="moveSnd" src="https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3"></audio>
 
+    <!-- التحكم بالصوت -->
+    <div class="audio-ctrl" onclick="toggleMusic()" id="musicBtn">🎵</div>
+
+    <!-- 1. الصفحة الرئيسية -->
+    <div id="page-home" class="page active">
+        <h1 style="color:var(--accent); font-size: 2.5rem; margin-bottom: 30px;">شطرنج برو</h1>
+        <button class="menu-btn" onclick="startGame('ai')">🤖 لاعب ضد الكمبيوتر</button>
+        <button class="menu-btn" onclick="startGame('friend')">👥 لاعب ضد صديق</button>
+        <button class="menu-btn" onclick="showProfile()" style="border-color:#3498db;">👤 البروفايل الشخصي</button>
+    </div>
+
+    <!-- 2. صفحة اللعبة -->
+    <div id="page-game" class="page">
+        <button class="back-btn" onclick="goHome()">🏠 القائمة</button>
+        <h3 id="game-mode-title">ضد الكمبيوتر</h3>
+        <div id="status" style="color:var(--accent); font-weight:bold; margin-bottom:10px;">دور: الأبيض</div>
+        <div id="board"></div>
+        <p style="font-size: 0.8rem; margin-top:10px; color:#888;">اضغط على القطعة ثم على الهدف</p>
+    </div>
+
+    <!-- 3. صفحة البروفايل -->
+    <div id="page-profile" class="page">
+        <button class="back-btn" onclick="goHome()">🏠 القائمة</button>
+        <div class="stats-container">
+            <h2>إحصائياتي</h2>
+            <div class="stat-row">
+                <div class="stat-item"><span id="w-val" class="stat-val">0</span><span>فوز</span></div>
+                <div class="stat-item"><span id="l-val" class="stat-val">0</span><span>خسارة</span></div>
+                <div class="stat-item"><span id="d-val" class="stat-val">0</span><span>تعادل</span></div>
+            </div>
+            <hr style="border:0.5px solid #333">
+            <button onclick="clearStats()" style="background:none; color:#e74c3c; cursor:pointer; border:none; margin-top:10px;">تصفير البيانات</button>
+        </div>
+    </div>
+
+    <!-- شاشة النهاية -->
     <div id="overlay">
-        <h1 id="overTitle">GAME OVER</h1>
-        <p id="overDesc" style="font-size: 1.5rem;"></p>
-        <button onclick="location.reload()" style="width: 200px;">لعب جديد</button>
-    </div>
-
-    <h3>شطرنج المحترفين</h3>
-    <div id="board-container">
-        <div id="board" class="board"></div>
-    </div>
-
-    <div class="controls">
-        <div id="status" class="status">الدور على: الأبيض</div>
-        <button onclick="location.reload()">جيم جديد</button>
-        <button onclick="toggleAI()" id="aiBtn">الوضع: ضد الكمبيوتر</button>
-        <button onclick="changeLang()" id="langBtn" style="width: 95%">English</button>
+        <h1 id="overTitle" style="color:#ff4444">انتهى الجيم</h1>
+        <p id="overDesc" style="font-size: 1.2rem; margin-bottom:20px;"></p>
+        <button class="menu-btn" onclick="goHome()">العودة للقائمة</button>
     </div>
 
     <script>
         const game = new Chess();
         const boardEl = document.getElementById('board');
         let selectedSquare = null;
-        let aiEnabled = true;
-        let lang = 'ar';
+        let gameMode = 'ai'; // 'ai' or 'friend'
+        let isMuted = false;
 
-        // روابط صور القطع
-        const pieceImages = {
-            'p': 'https://chessboardjs.com/img/chesspieces/wikipedia/bP.png',
-            'r': 'https://chessboardjs.com/img/chesspieces/wikipedia/bR.png',
-            'n': 'https://chessboardjs.com/img/chesspieces/wikipedia/bN.png',
-            'b': 'https://chessboardjs.com/img/chesspieces/wikipedia/bB.png',
-            'q': 'https://chessboardjs.com/img/chesspieces/wikipedia/bQ.png',
-            'k': 'https://chessboardjs.com/img/chesspieces/wikipedia/bK.png',
-            'P': 'https://chessboardjs.com/img/chesspieces/wikipedia/wP.png',
-            'R': 'https://chessboardjs.com/img/chesspieces/wikipedia/wR.png',
-            'N': 'https://chessboardjs.com/img/chesspieces/wikipedia/wN.png',
-            'B': 'https://chessboardjs.com/img/chesspieces/wikipedia/wB.png',
-            'Q': 'https://chessboardjs.com/img/chesspieces/wikipedia/wQ.png',
-            'K': 'https://chessboardjs.com/img/chesspieces/wikipedia/wK.png'
+        // --- نظام الملاحة ---
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + id).classList.add('active');
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            game.reset();
+            document.getElementById('game-mode-title').innerText = mode === 'ai' ? '🤖 ضد الكمبيوتر' : '👥 ضد صديق';
+            showPage('game');
+            createBoard();
+            updateStatus();
+            // بدء الموسيقى عند أول تفاعل
+            if(!isMuted) document.getElementById('bgMusic').play().catch(()=>{});
+        }
+
+        function showProfile() {
+            loadStats();
+            showPage('profile');
+        }
+
+        function goHome() {
+            document.getElementById('overlay').style.display = 'none';
+            showPage('home');
+        }
+
+        // --- التحكم بالصوت ---
+        function toggleMusic() {
+            const music = document.getElementById('bgMusic');
+            isMuted = !isMuted;
+            if (isMuted) {
+                music.pause();
+                document.getElementById('musicBtn').innerText = '🔇';
+            } else {
+                music.play();
+                document.getElementById('musicBtn').innerText = '🎵';
+            }
+        }
+
+        // --- الإحصائيات ---
+        function updateStats(res) {
+            let s = JSON.parse(localStorage.getItem('ch_st')) || {w:0, l:0, d:0};
+            if(res === 'win') s.w++; else if(res === 'loss') s.l++; else s.d++;
+            localStorage.setItem('ch_st', JSON.stringify(s));
+        }
+
+        function loadStats() {
+            let s = JSON.parse(localStorage.getItem('ch_st')) || {w:0, l:0, d:0};
+            document.getElementById('w-val').innerText = s.w;
+            document.getElementById('l-val').innerText = s.l;
+            document.getElementById('d-val').innerText = s.d;
+        }
+
+        function clearStats() { if(confirm("حذف كل الإحصائيات؟")) { localStorage.removeItem('ch_st'); loadStats(); } }
+
+        // --- منطق الشطرنج ---
+        const pieces = {
+            'p': 'https://chessboardjs.com/img/chesspieces/wikipedia/bP.png','r': 'https://chessboardjs.com/img/chesspieces/wikipedia/bR.png','n': 'https://chessboardjs.com/img/chesspieces/wikipedia/bN.png','b': 'https://chessboardjs.com/img/chesspieces/wikipedia/bB.png','q': 'https://chessboardjs.com/img/chesspieces/wikipedia/bQ.png','k': 'https://chessboardjs.com/img/chesspieces/wikipedia/bK.png',
+            'P': 'https://chessboardjs.com/img/chesspieces/wikipedia/wP.png','R': 'https://chessboardjs.com/img/chesspieces/wikipedia/wR.png','N': 'https://chessboardjs.com/img/chesspieces/wikipedia/wN.png','B': 'https://chessboardjs.com/img/chesspieces/wikipedia/wB.png','Q': 'https://chessboardjs.com/img/chesspieces/wikipedia/wQ.png','K': 'https://chessboardjs.com/img/chesspieces/wikipedia/wK.png'
         };
 
         function createBoard() {
             boardEl.innerHTML = '';
             for (let i = 0; i < 64; i++) {
-                const row = Math.floor(i / 8);
-                const col = i % 8;
-                const squareName = String.fromCharCode(97 + col) + (8 - row);
-                const square = document.createElement('div');
-                square.classList.add('square');
-                square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                square.dataset.square = squareName;
-                square.onclick = () => handleSquareClick(squareName);
-                boardEl.appendChild(square);
+                const r = Math.floor(i / 8), c = i % 8;
+                const name = String.fromCharCode(97 + c) + (8 - r);
+                const sq = document.createElement('div');
+                sq.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                sq.dataset.square = name;
+                sq.onclick = () => handleClick(name);
+                boardEl.appendChild(sq);
             }
-            renderPieces();
+            render();
         }
 
-        function renderPieces() {
-            const squares = document.querySelectorAll('.square');
-            squares.forEach(sq => {
-                sq.innerHTML = '';
-                sq.classList.remove('hint', 'selected');
-                const piece = game.get(sq.dataset.square);
-                if (piece) {
-                    const img = document.createElement('img');
-                    img.src = pieceImages[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
-                    sq.appendChild(img);
-                }
+        function render() {
+            document.querySelectorAll('.square').forEach(sq => {
+                sq.innerHTML = ''; sq.classList.remove('hint', 'selected');
+                const p = game.get(sq.dataset.square);
+                if (p) { const img = document.createElement('img'); img.src = pieces[p.color === 'w' ? p.type.toUpperCase() : p.type]; sq.appendChild(img); }
             });
         }
 
-        function handleSquareClick(square) {
+        function handleClick(sq) {
             if (game.game_over()) return;
-
-            // إذا كان هناك تلميح، يعني هذا المربع هدف للحركة
-            const hints = document.querySelectorAll('.hint');
-            let isHint = false;
-            hints.forEach(h => { if(h.dataset.square === square) isHint = true; });
-
-            if (isHint) {
-                executeMove(selectedSquare, square);
-                return;
+            if (document.querySelector(`[data-square="${sq}"]`).classList.contains('hint')) {
+                move(selectedSquare, sq); return;
             }
-
-            // اختيار قطعة
-            const piece = game.get(square);
-            if (piece && piece.color === game.turn()) {
-                selectedSquare = square;
-                renderPieces();
-                document.querySelector(`[data-square="${square}"]`).classList.add('selected');
-                const moves = game.moves({ square: square, verbose: true });
-                moves.forEach(m => {
-                    document.querySelector(`[data-square="${m.to}"]`).classList.add('hint');
-                });
-            } else {
-                selectedSquare = null;
-                renderPieces();
+            const p = game.get(sq);
+            if (p && p.color === game.turn()) {
+                selectedSquare = sq; render();
+                document.querySelector(`[data-square="${sq}"]`).classList.add('selected');
+                game.moves({ square: sq, verbose: true }).forEach(m => document.querySelector(`[data-square="${m.to}"]`).classList.add('hint'));
             }
         }
 
-        function executeMove(from, to) {
-            const move = game.move({ from, to, promotion: 'q' });
-            if (move) {
-                document.getElementById(move.captured ? 'captureSound' : 'moveSound').play();
-                renderPieces();
-                updateStatus();
-                if (aiEnabled && !game.game_over()) {
-                    setTimeout(makeBestMove, 600);
-                }
+        function move(from, to) {
+            if (game.move({ from, to, promotion: 'q' })) {
+                document.getElementById('moveSnd').play();
+                render(); updateStatus();
+                if (gameMode === 'ai' && !game.game_over()) setTimeout(aiMove, 600);
             }
-            selectedSquare = null;
         }
 
-        // ذكاء اصطناعي متوسط القوة
-        function makeBestMove() {
-            const moves = game.moves();
-            if (moves.length === 0) return;
-            
-            // ترتيب الحركات (الأولوية للأكل ثم الكش ثم العشوائي)
-            moves.sort((a, b) => b.includes('x') - a.includes('x'));
-            const bestMove = moves.find(m => m.includes('#')) || moves.find(m => m.includes('+')) || moves[0];
-            
-            const moveResult = game.move(bestMove);
-            document.getElementById(moveResult.captured ? 'captureSound' : 'moveSound').play();
-            renderPieces();
-            updateStatus();
+        function aiMove() {
+            const m = game.moves();
+            game.move(m[Math.floor(Math.random() * m.length)]);
+            document.getElementById('moveSnd').play();
+            render(); updateStatus();
         }
 
         function updateStatus() {
-            const turn = game.turn() === 'w' ? (lang === 'ar' ? 'الأبيض' : 'White') : (lang === 'ar' ? 'الأسود' : 'Black');
-            document.getElementById('status').innerText = (lang === 'ar' ? 'دور: ' : 'Turn: ') + turn;
-
+            const turn = game.turn() === 'w' ? 'الأبيض' : 'الأسود';
+            document.getElementById('status').innerText = "دور: " + turn;
             if (game.game_over()) {
+                let msg = game.in_checkmate() ? (game.turn() === 'b' ? "فزت على الكمبيوتر!" : "خسر الأبيض!") : "تعادل!";
+                if(gameMode === 'ai') updateStats(game.turn() === 'b' ? 'win' : 'loss');
+                document.getElementById('overDesc').innerText = msg;
                 document.getElementById('overlay').style.display = 'flex';
-                let res = lang === 'ar' ? "انتهت اللعبة!" : "Game Over!";
-                if (game.in_draw()) res = lang === 'ar' ? "تعادل!" : "Draw!";
-                else res += (lang === 'ar' ? " فاز " : " Winner: ") + (game.turn() === 'w' ? (lang === 'ar' ? 'الأسود' : 'Black') : (lang === 'ar' ? 'الأبيض' : 'White'));
-                document.getElementById('overDesc').innerText = res;
             }
         }
 
-        function toggleAI() {
-            aiEnabled = !aiEnabled;
-            document.getElementById('aiBtn').innerText = aiEnabled ? 
-                (lang === 'ar' ? 'الوضع: ضد الكمبيوتر' : 'Mode: vs AI') : 
-                (lang === 'ar' ? 'الوضع: لاعبين' : 'Mode: 2 Players');
-        }
-
-        function changeLang() {
-            lang = lang === 'ar' ? 'en' : 'ar';
-            document.getElementById('langBtn').innerText = lang === 'ar' ? 'English' : 'العربية';
-            updateStatus();
-            toggleAI(); toggleAI();
-        }
-
-        // تشغيل اللعبة
         createBoard();
     </script>
 </body>
